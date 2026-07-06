@@ -1,94 +1,73 @@
-# ZORTHEX™ Enterprise Legal Scanner
-*Independent project — June 2026*
-*Powered by Claude — Renato Santi*
+# ZORTHEX™ ZTR — Zorthex Temporal Registry
+### A demonstrability instrument for professional verification duties
+
+Independent project — 2026 · Powered by Claude — Renato Santi
+**Private repository — confidential. Not for public release.**
 
 ---
 
 ## What This Is
 
-An on-premise MCP Server designed to identify documents produced during the structural risk window between formal AI policy adoption and operational behavioral change in legal practice.
+An on-premise system that produces **contemporaneous records**: dated, immutable, judgment-free evidence that a verification step occurred — **which checks were executed, when, and against which norm in force**.
 
-Built on the Zorthex™ ZTR (Zorthex Temporal Registry) framework — an empirical methodology for measuring institutional adaptation latency.
+It does not attest that anyone acted correctly. It proves that the verification process happened, at a certain time, under a certain rule — and what was or was not checked at that time. The assessment stays with the firm; only the fact of the process is recorded.
 
----
+Built on the Zorthex™ L₂ research framework — an empirical methodology for measuring the interval between a norm entering into force and the first documented failure of its application.
 
 ## The Problem
 
-Existing AI content detectors look for surface signals. They fail because:
+Courts have started asking a new question. Not "did you lie?" but **"can you demonstrate that verification occurred — and when?"** Recent primary sources show the pattern:
 
-1. Professionals learn to clean AI output at the surface level while structural anomalies remain
-2. No existing tool correlates document production timing with documented policy propagation failures
-3. Enterprise-grade legal environments cannot upload documents to external cloud services (confidentiality, NDA, professional privilege)
+- A US federal court converted the *absence* of a contemporaneous record into evidence of guilt (adverse inference for destroyed AI usage history; six-month suspension — for the missing record, not the error).
+- A state court ordered a firm, *after* the incident, to audit its knowledge base and report on the process used — demonstrability demanded retroactively.
+- Firms' own dated internal AI policies are quoted verbatim in federal sanction orders as the measure of what should have been known.
 
----
+No existing tool produces that proof *in advance*. Cloud AI detectors cannot operate in privileged environments; surface-level detection fails against edited output; and no record exists that a human gate was actually passed.
 
-## The Approach
+## Architecture — three layers, one honest posture
 
-This scanner operates on two independent axes:
+**1. Scanner (v0.4) — local assessment.**
+Two independent axes: *temporal* (document date vs. the most specific applicable policy anchor — national norm, forum precedent, or the client's own dated internal policy) and *structural* (deep patterns of unsupervised AI generation, calibrated on real sanctioned filings). Output stays with the firm. Never notarised.
 
-**Temporal:** Documents are evaluated against documented policy milestones (e.g. ABA Formal Opinion 512, July 2024) to determine whether they were produced inside the structural blind window — the interval between policy issuance and operational behavioral change.
+**2. Temporal Registry (capsule v1.2) — the contemporaneous record.**
+The document is hashed (SHA-256) and discarded — it never leaves the client's infrastructure and is never stored. The capsule contains facts only: document hash, policy identity/hash/date, temporal window, and a **verification manifest** declaring which checks were executed — including what is deliberately out of scope. No verdicts: the capsule of a clean document and a problematic one are byte-for-byte indistinguishable (enforced in code; a judgment term entering the capsule halts the system). HMAC-sealed.
 
-**Structural:** Documents are analyzed for deep structural patterns associated with unsupervised AI generation — not keyword matching, but citation density anomalies, formulaic boilerplate distribution, and citation-to-analysis ratios calibrated against real sanctioned cases.
+**3. Qualified timestamp (RFC 3161 / eIDAS).**
+Each capsule is stamped by a Qualified Trust Service Provider (eIDAS): the time is legally presumed accurate and opposable to third parties across the EU (recognised under UK eIDAS as well), with 30-year archival by the TSA. Honest states are enforced: without a qualified stamp, the capsule itself declares it is not admissible as dated proof. The system never pretends.
 
----
+- On-premise MCP Server (FastMCP / Python) · plug-and-play with Claude Desktop / Enterprise
+- Zero data leak: only a 64-character hash ever leaves the document's machine — and only towards the TSA
+- Policy contexts: foundational (2023–24), ABA 512 (2024+), forum anchors (e.g. N.D. Ala. published precedent), client internal policies, PQC/NIST
 
-## Architecture
+## Declared Perimeter (verified, not hidden)
 
-- On-premise MCP Server (FastMCP / Python)
-- Zero data leak — documents never leave client infrastructure
-- Plug-and-play with Claude Desktop and Claude Enterprise
-- Three policy contexts: AI_LEGAL_EARLY (2023-2024), AI_LEGAL (ABA 512, 2024+), PQC_CRYPTO (NIST FIPS, 2024+)
+The scanner detects **Mode 1**: unreviewed AI output pasted into filings (structural anomalies). It does **not** detect **Mode 2**: fabricated citations woven into human-written prose — verified empirically on two real sanctioned filings (Mata v. Avianca Doc #21; Miller/Harp Doc #23: both structurally clean by construction). No on-premise tool can verify citation existence without leaving the infrastructure. Mode 2 coverage is what the **Registry** provides: dated proof that the required human verification gate was passed. The perimeter is declared inside the record itself.
 
----
+## Calibration & Case Foundation
 
-## Calibration
-
-Calibrated against real judicial decisions from PACER (USA), BAILII (UK), and the Charlotin AI Hallucinations Database (n=1,522 cases as of May 2026).
-
-Test set: 10 verified cases (5 sanctioned, 5 clean). Accuracy: 90%. Zero false positives on clean documents.
-
-The single remaining error is a human-authored declaration of admission — the system correctly identified it as human-written text, confirming methodological precision.
-
----
-
-## Theoretical Foundation
-
-Built on the ZTR L₂ metric:
-
-**L₂f = t_incident − t_policy (months)**
-
-Empirically observed: systemic boundary at 22 months across the May 2026 USA cluster (ABA Opinion 512 as t_policy anchor, n=6 verified cases).
-
-Cross-jurisdictional reference: Cork v. Smith (UK, Chancery Division, May 2026) — L₂f = 19 months.
-
-Full methodology: [zorthex.com/methodology](https://zorthex.com/methodology)
-Dataset DOI: [10.5281/zenodo.20374051](https://doi.org/10.5281/zenodo.20374051)
-
----
+- Test set: 10 verified cases from primary sources (5 sanctioned / 5 clean). **Accuracy 90%, zero false positives.** Declared threshold stays 90% regardless of future runs (under-promise policy). Composition review in progress; a real sanctioned party filing (Miller Doc #23) added.
+- Sources: PACER (USA), BAILII (UK), OSCN, courts.ca.gov, Charlotin AI Hallucinations Database (~1,600 cases, June 2026).
+- **L₂ metric: L₂f = t_incident − t_policy (months).** Verified at full depth (both endpoints, primary sources, Level A):
+  - Cork v. Smith (UK): Ayinde → incident, **9.8 months**
+  - Johnson v. Dunn / OBA v. Reeves chain (USA): internal dated policies + ABA 512 → **4.2 / 10.2 / 23 months**
+  - Miller v. Regions Bank (USA): published forum precedent → **4.3 months** (17 from ABA 512)
+- Observed pattern (declared as observation, n small, survivorship bias stated; never predictive on the single case): the closer the anchor, the shorter the window — and transmission fails anyway. Sanctions published in one case become the policy anchor of the next: the propagation chain is documented inside the orders themselves, identically in the UK and the US.
 
 ## Status
 
-- [x] Prototype v0.3 — functional and calibrated
-- [x] Test set verified on real court documents
-- [ ] Public release — pending Zorthex v2.0 deployment (August 2026)
-- [ ] Enterprise DOI — pending
-
----
+- Scanner v0.4 · Capsule v1.2 (verification manifest + qualified timestamp) — functional, calibrated, English output
+- Full test suite green (registry, manifest, date handling, tamper detection, honest-fallback paths)
+- First qualified (eIDAS) capsule produced: July 2026
+- External installation verified on independent hardware
+- Public release: **not planned** — this layer is under confidential legal review
 
 ## Parent Project
 
-This is a derivative application of the Zorthex™ research framework.
-
-Main repository: [github.com/zorthex2026/zorthex-diffusion-lag](https://github.com/zorthex2026/zorthex-diffusion-lag)
-
----
+Derivative application of the Zorthex™ research framework (public track):
+live app & reports: https://zorthex.com · dataset: https://doi.org/10.5281/zenodo.20589503
+Main repository: https://github.com/zorthex2026/zorthex-diffusion-lag
 
 ## License
 
 Proprietary — All rights reserved. Not licensed for use, reproduction, or distribution without explicit written permission.
-
 © 2026 Renato Santi — ZORTHEX™ (Trademark UIBM N.302026000090628)
-
----
-
-*Zorthex is descriptive only and does not constitute legal advice.*
