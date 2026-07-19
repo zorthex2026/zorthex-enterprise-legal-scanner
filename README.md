@@ -61,6 +61,77 @@ The scanner detects **Mode 1**: unreviewed AI output pasted into filings (struct
 - External installation verified on independent hardware
 - Public release: **not planned** — this layer is under confidential legal review
 
+---
+
+## Remote MCP Connector
+
+### What This Adds
+
+A remote deployment mode for the Temporal Registry, designed for the **Anthropic Connectors Directory** (Claude Cowork / Claude Web).
+
+The on-premise mode (existing) runs everything locally:
+
+```
+Claude Desktop → local MCP → scanner + registry on client machine
+```
+
+The remote mode exposes **only the Temporal Registry** via HTTPS:
+
+```
+Claude Cowork → HTTPS → temporalregistry.com → registry only
+```
+
+The scanner remains on-premise. Only the verification receipt layer is exposed remotely. The document is hashed server-side and immediately discarded — never stored, never logged.
+
+### File
+
+`ztr_remote_connector.py` — standalone FastAPI server, derived from capsule v1.2 logic. Same SHA-256, same Aruba PEC TSA, same eIDAS qualification. Adds: HTTP transport, receipt storage (SQLite), OAuth readiness, Anthropic directory compliance.
+
+### Tools Exposed
+
+| Tool | Action | Read/Write |
+|------|--------|------------|
+| `verify_document` | Hash + timestamp + receipt | Write |
+| `check_receipt` | Retrieve a receipt by ID | Read |
+| `list_receipts` | List user's receipts | Read |
+
+### Deployment
+
+```bash
+# Install dependencies
+pip install fastapi uvicorn requests
+
+# Run locally for testing
+python ztr_remote_connector.py
+
+# Deploy to temporalregistry.com via Railway/Render
+# See ZTR_MCP_ROADMAP.md for full deployment guide
+```
+
+### Relationship to On-Premise Mode
+
+| Feature | On-Premise | Remote |
+|---------|-----------|--------|
+| Scanner | ✅ Local | ❌ Not exposed |
+| Registry / Capsule | ✅ Local | ✅ Via HTTPS |
+| Document storage | ❌ Never | ❌ Never |
+| TSA (eIDAS) | ✅ Aruba PEC | ✅ Aruba PEC |
+| Verdict / judgment | ✅ Local only | ❌ Not available |
+| User auth | N/A (local) | OAuth 2.0 |
+| Anthropic Directory | ❌ | ✅ Submitted |
+
+### Requirements (remote mode only)
+
+```
+fastapi>=0.115.0
+uvicorn>=0.30.0
+requests>=2.32.0
+```
+
+Core dependencies (hashlib, sqlite3, json, subprocess) are Python stdlib.
+
+---
+
 ## Parent Project
 
 Derivative application of the Zorthex™ research framework (public track):
