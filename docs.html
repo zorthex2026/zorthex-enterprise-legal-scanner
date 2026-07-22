@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Documentation — Zorthex Temporal Registry</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0a;color:#e0e0e0;font-family:'Segoe UI',system-ui,sans-serif;padding:40px 24px;line-height:1.8}
+.page{max-width:720px;margin:0 auto}
+.nav{font-size:12px;color:#555;margin-bottom:32px}
+.nav a{color:#00d4aa;text-decoration:none}
+h1{font-size:24px;font-weight:700;color:#fff;margin-bottom:6px}
+.sub{color:#00d4aa;font-size:13px;margin-bottom:8px}
+.updated{font-size:11px;color:#555;margin-bottom:32px;padding-bottom:20px;border-bottom:1px solid #1a1a1a}
+h2{color:#00d4aa;font-size:15px;font-weight:600;margin:28px 0 10px}
+h3{color:#ccc;font-size:13px;font-weight:600;margin:18px 0 6px}
+p{font-size:13.5px;color:#bbb;margin-bottom:12px}
+ul{margin:8px 0 12px 20px}
+li{font-size:13.5px;color:#bbb;margin-bottom:6px;line-height:1.6}
+strong{color:#e0e0e0}
+code{background:#1a1a1a;color:#00d4aa;padding:2px 6px;border-radius:3px;font-family:'Courier New',monospace;font-size:12px}
+pre{background:#111;border:1px solid #222;border-radius:4px;padding:16px;margin:12px 0;overflow-x:auto}
+pre code{background:none;padding:0;color:#a0c8b8;font-size:12px;line-height:1.6}
+.highlight{background:#111;border-left:3px solid #00d4aa;padding:14px 16px;margin:16px 0;border-radius:0 3px 3px 0}
+.highlight p{color:#a0c8b8;margin-bottom:0;font-size:13px}
+.warn{background:#120a0a;border-left:3px solid #ff4444;padding:14px 16px;margin:16px 0;border-radius:0 3px 3px 0}
+.warn p{color:#d0a0a0;margin-bottom:0;font-size:13px}
+table{width:100%;border-collapse:collapse;margin:12px 0;font-size:12.5px}
+th{background:#1a1a1a;color:#00d4aa;text-align:left;padding:8px 10px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px}
+td{background:#111;padding:8px 10px;border-bottom:1px solid #1a1a1a;color:#bbb}
+.foot{font-size:11px;color:#444;margin-top:40px;padding-top:16px;border-top:1px solid #1a1a1a;text-align:center}
+.foot a{color:#00d4aa;text-decoration:none}
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="nav"><a href="/">temporalregistry.com</a> · Documentation</div>
+
+<h1>Documentation</h1>
+<div class="sub">Zorthex Temporal Registry (ZTR) — MCP Connector for Claude</div>
+<div class="updated">Version 0.1 · July 2026</div>
+
+<div class="highlight">
+<p><strong>What ZTR does in one sentence:</strong> When you review an AI-generated document before filing or use, ZTR timestamps that review — creating a contemporaneous record proving the human gate was passed.</p>
+</div>
+
+<h2>1. The Problem ZTR Solves</h2>
+<p>Courts and regulators are asking a new question: not "did you use AI?" but "can you demonstrate that verification occurred — and when?"</p>
+<p>Recent cases show the pattern clearly. In <em>Miller v. Regions Bank</em> (N.D. Alabama, 2026), a US federal court applied a two-track doctrine: the AI error received a public reprimand, but the destruction of the ChatGPT account received adverse inference, contempt, and a six-month suspension. The absence of a contemporaneous record was treated as evidence of fault — more serious than the error itself.</p>
+<p>No existing tool produces that proof in advance. ZTR does.</p>
+
+<h2>2. How It Works</h2>
+
+<h3>Step 1 — You review a document</h3>
+<p>You use Claude to draft or research a legal document. You read it, check the citations, apply your professional judgment.</p>
+
+<h3>Step 2 — You call ZTR</h3>
+<p>Before filing or sending, you ask Claude to verify the document with ZTR. Claude calls the <code>verify_document</code> tool.</p>
+
+<h3>Step 3 — ZTR creates a receipt</h3>
+<p>ZTR hashes the document (SHA-256), records the timestamp, and creates a verification receipt. The document text is immediately discarded — only the 64-character hash is stored.</p>
+
+<h3>Step 4 — You receive a receipt ID</h3>
+<p>You receive a receipt like <code>ZTR-20260720143022-a7f3c891</code>. This is your proof. If ever asked "did you verify this before filing?" — you have a dated, immutable record.</p>
+
+<div class="warn">
+<p><strong>What ZTR does NOT do:</strong> ZTR does not check whether the document is correct, whether citations exist, or whether AI was used. It certifies only that a verification step occurred at a specific time. The professional judgment remains entirely yours.</p>
+</div>
+
+<h2>3. Installing the Connector</h2>
+
+<h3>Requirements</h3>
+<ul>
+<li>A Claude account (Pro or above)</li>
+<li>Access to Claude's Connectors Directory</li>
+</ul>
+
+<h3>Installation</h3>
+<ol style="margin:8px 0 12px 20px">
+<li style="font-size:13.5px;color:#bbb;margin-bottom:8px">Open Claude and go to Settings → Connectors</li>
+<li style="font-size:13.5px;color:#bbb;margin-bottom:8px">Search for "Zorthex Temporal Registry"</li>
+<li style="font-size:13.5px;color:#bbb;margin-bottom:8px">Click Connect and authorise with your email</li>
+<li style="font-size:13.5px;color:#bbb;margin-bottom:8px">ZTR is ready to use</li>
+</ol>
+
+<h2>4. Using ZTR with Claude</h2>
+
+<h3>Verify a document before filing</h3>
+<pre><code>You: I've reviewed this brief and I'm ready to file. 
+     Please verify it with ZTR before I do.
+
+Claude: [calls verify_document]
+        Verification recorded.
+        Receipt: ZTR-20260720143022-a7f3c891
+        Hash: 6576176c9194ee14...
+        Time: 2026-07-20T14:30:22Z
+        TSA: VERIFIED (eIDAS)
+        Document was not stored.</code></pre>
+
+<h3>Retrieve a past receipt</h3>
+<pre><code>You: Can you look up receipt ZTR-20260720143022-a7f3c891?
+
+Claude: [calls check_receipt]
+        Receipt found.
+        Document hash: 6576176c9194ee14...
+        Verified: 2026-07-20T14:30:22Z
+        Context: legal_filing
+        TSA: VERIFIED (eIDAS)</code></pre>
+
+<h3>List recent verifications</h3>
+<pre><code>You: Show me all documents I verified this week.
+
+Claude: [calls list_receipts with date_from filter]
+        7 receipts found between 2026-07-14 and 2026-07-20.</code></pre>
+
+<h2>5. Available Tools</h2>
+
+<table>
+<tr><th>Tool</th><th>What it does</th><th>When to use</th></tr>
+<tr><td><code>verify_document</code></td><td>Hash + timestamp + receipt</td><td>Before filing any AI-assisted document</td></tr>
+<tr><td><code>check_receipt</code></td><td>Retrieve receipt by ID</td><td>Audit trail lookup, due diligence</td></tr>
+<tr><td><code>list_receipts</code></td><td>List your receipts</td><td>Periodic compliance review</td></tr>
+</table>
+
+<h2>6. Technical Details</h2>
+
+<h3>Hashing</h3>
+<p>Documents are hashed using SHA-256 (Python hashlib). The hash is a one-way mathematical fingerprint — it cannot be reversed to recover the document. Only the 64-character hexadecimal hash is stored.</p>
+
+<h3>Timestamps</h3>
+<p>Standard receipts include a server timestamp (ISO 8601 UTC). eIDAS-qualified timestamps are provided via Aruba PEC S.p.A., a Qualified Trust Service Provider under eIDAS Regulation (EU) 910/2014. eIDAS timestamps are RFC 3161 compliant and legally presumed accurate across the EU and UK.</p>
+
+<h3>Storage</h3>
+<p>Receipts are stored in a secure database on EU servers. The document text is never written to disk, never logged, and never transmitted beyond the hash. See the <a href="/privacy" style="color:#00d4aa">Privacy Policy</a> for full details.</p>
+
+<h3>Integrity</h3>
+<p>Each receipt is sealed with an HMAC-SHA256 integrity check to detect tampering.</p>
+
+<h2>7. Context Types</h2>
+
+<table>
+<tr><th>Context</th><th>Use case</th></tr>
+<tr><td><code>legal_filing</code></td><td>Court submissions, briefs, motions</td></tr>
+<tr><td><code>contract_review</code></td><td>Contract drafting and review</td></tr>
+<tr><td><code>legal_research</code></td><td>Research memos, opinion letters</td></tr>
+<tr><td><code>client_advice</code></td><td>Client-facing documents</td></tr>
+<tr><td><code>regulatory_submission</code></td><td>Regulatory filings, compliance documents</td></tr>
+<tr><td><code>internal_memo</code></td><td>Internal documents</td></tr>
+<tr><td><code>other</code></td><td>Any other document type</td></tr>
+</table>
+
+<h2>8. About ZTR</h2>
+<p>ZTR is built on the Zorthex™ L₂ research framework — an empirical methodology for measuring the interval between a governing norm and the first documented failure of its application. The framework has been validated across six verified cases in the US and UK legal systems.</p>
+<p>ZTR is powered by Claude (Anthropic). Trademark: UIBM N.302026000090628.</p>
+
+<h2>9. Support</h2>
+<p>For questions, issues, or feedback: zorthex.official@gmail.com</p>
+
+<div class="foot">
+<a href="/">Home</a> · <a href="/privacy">Privacy Policy</a> · <a href="/terms">Terms of Service</a><br><br>
+© 2026 Renato Santi — ZORTHEX™ (Trademark UIBM N.302026000090628) · Powered by Claude
+</div>
+
+</div>
+</body>
+</html>
