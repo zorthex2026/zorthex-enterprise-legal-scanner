@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Privacy Policy — Zorthex Temporal Registry</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0a;color:#e0e0e0;font-family:'Segoe UI',system-ui,sans-serif;padding:40px 24px;line-height:1.8}
+.page{max-width:720px;margin:0 auto}
+.nav{font-size:12px;color:#555;margin-bottom:32px}
+.nav a{color:#00d4aa;text-decoration:none}
+h1{font-size:24px;font-weight:700;color:#fff;margin-bottom:6px}
+.sub{color:#00d4aa;font-size:13px;margin-bottom:8px}
+.updated{font-size:11px;color:#555;margin-bottom:32px;padding-bottom:20px;border-bottom:1px solid #1a1a1a}
+h2{color:#00d4aa;font-size:15px;font-weight:600;margin:28px 0 10px}
+p{font-size:13.5px;color:#bbb;margin-bottom:12px}
+ul{margin:8px 0 12px 20px}
+li{font-size:13.5px;color:#bbb;margin-bottom:6px;line-height:1.6}
+strong{color:#e0e0e0}
+.highlight{background:#111;border-left:3px solid #00d4aa;padding:14px 16px;margin:16px 0;border-radius:0 3px 3px 0}
+.highlight p{color:#a0c8b8;margin-bottom:0;font-size:13px}
+.foot{font-size:11px;color:#444;margin-top:40px;padding-top:16px;border-top:1px solid #1a1a1a;text-align:center}
+.foot a{color:#00d4aa;text-decoration:none}
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="nav"><a href="/">temporalregistry.com</a> · Privacy Policy</div>
+
+<h1>Privacy Policy</h1>
+<div class="sub">Zorthex Temporal Registry (ZTR)</div>
+<div class="updated">Last updated: July 2026 · Effective: July 2026</div>
+
+<div class="highlight">
+<p><strong>The short version:</strong> We never see your documents. We store only a 64-character hash of the document text, plus the timestamp of the verification and your user identity. The document itself is hashed and immediately discarded — it never leaves your machine in readable form.</p>
+</div>
+
+<h2>1. Who We Are</h2>
+<p>Zorthex Temporal Registry ("ZTR", "we", "us") is operated by Renato Santi, independent researcher and creator of the Zorthex™ framework. Contact: zorthex.official@gmail.com. Jurisdiction: Italy / European Union.</p>
+
+<h2>2. What We Collect</h2>
+<p>When you use the ZTR connector to verify a document, we collect and store:</p>
+<ul>
+<li><strong>SHA-256 hash</strong> of the document text (64 characters). This is a one-way mathematical fingerprint — it cannot be reversed to recover the original document.</li>
+<li><strong>Verification timestamp</strong> (ISO 8601 UTC) — the exact moment the verification was recorded.</li>
+<li><strong>Your user identifier</strong> (email address) provided during authentication.</li>
+<li><strong>Organisation identifier</strong> (optional) if provided during setup.</li>
+<li><strong>Review note</strong> (optional) — any note you choose to add describing the verification performed.</li>
+<li><strong>Review context</strong> — the type of review selected (e.g. legal_filing, contract_review).</li>
+<li><strong>TSA token</strong> — the RFC 3161 timestamp response from Aruba PEC, when eIDAS-qualified timestamping is used.</li>
+<li><strong>Verification status</strong> — whether the eIDAS timestamp was successfully obtained.</li>
+</ul>
+
+<h2>3. What We Never Collect</h2>
+<ul>
+<li>The original document text or content</li>
+<li>Any file, attachment, or binary uploaded</li>
+<li>The contents of your Claude conversations</li>
+<li>Any personally identifiable information beyond your email address</li>
+<li>Payment information (ZTR is currently free to use)</li>
+</ul>
+
+<div class="highlight">
+<p>The document text is hashed server-side and immediately discarded. It is never written to disk, never logged, never transmitted to any third party. Only the 64-character SHA-256 hash is retained.</p>
+</div>
+
+<h2>4. How We Use Your Data</h2>
+<p>The data we collect is used exclusively to:</p>
+<ul>
+<li>Generate and store your verification receipt</li>
+<li>Allow you to retrieve receipts you have created</li>
+<li>Provide an audit trail of verification activity for your organisation</li>
+<li>Obtain eIDAS-qualified timestamps from Aruba PEC (the hash is transmitted to Aruba's TSA endpoint for this purpose)</li>
+</ul>
+<p>We do not use your data for advertising, profiling, model training, or any purpose other than providing the verification service.</p>
+
+<h2>5. Third-Party Services</h2>
+<p><strong>Aruba PEC S.p.A.</strong> — When eIDAS-qualified timestamping is used, the SHA-256 hash of your document (not the document itself) is transmitted to Aruba PEC's Qualified Trust Service Provider endpoint (freetsa.aruba.it) to obtain an RFC 3161 timestamp. Aruba PEC is a Qualified Trust Service Provider under eIDAS Regulation (EU) 910/2014. Their timestamp tokens are archived for 30 years. Aruba's privacy policy: aruba.it/privacy.</p>
+<p>No other third-party services receive your data.</p>
+
+<h2>6. Data Retention</h2>
+<p>Verification receipts are retained indefinitely to support the demonstrability purpose of the service — a receipt may need to be retrieved months or years after it was created to demonstrate that verification occurred at a specific time. If you wish to have your receipts deleted, contact us at zorthex.official@gmail.com.</p>
+
+<h2>7. Your Rights (GDPR)</h2>
+<p>As a resident of the European Union or European Economic Area, you have the right to:</p>
+<ul>
+<li>Access the personal data we hold about you</li>
+<li>Request correction of inaccurate data</li>
+<li>Request deletion of your data (subject to legal retention requirements)</li>
+<li>Request restriction of processing</li>
+<li>Data portability — receive your receipts in machine-readable format</li>
+<li>Lodge a complaint with your national data protection authority</li>
+</ul>
+<p>To exercise any of these rights, contact: zorthex.official@gmail.com</p>
+
+<h2>8. Security</h2>
+<p>All data is transmitted over HTTPS. The receipt database is stored on servers in the European Union. Access is authenticated via OAuth 2.0. The SHA-256 hashing is performed using Python's standard library hashlib module. HMAC-SHA256 integrity seals are applied to each receipt.</p>
+
+<h2>9. Changes to This Policy</h2>
+<p>We will update this page if our data practices change. The "last updated" date at the top of this page reflects the most recent revision.</p>
+
+<h2>10. Contact</h2>
+<p>Renato Santi · Zorthex™ · zorthex.official@gmail.com · temporalregistry.com</p>
+
+<div class="foot">
+<a href="/">Home</a> · <a href="/terms">Terms of Service</a> · <a href="/docs">Documentation</a><br><br>
+© 2026 Renato Santi — ZORTHEX™ (Trademark UIBM N.302026000090628)
+</div>
+
+</div>
+</body>
+</html>
