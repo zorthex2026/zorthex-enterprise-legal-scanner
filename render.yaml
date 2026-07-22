@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: zorthex-enterprise-legal-scanner-1
+    runtime: python
+    buildCommand: apt-get install -y openssl && pip install -r requirements.txt
+    startCommand: uvicorn ztr_remote_connector:create_app --factory --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: ZTR_HMAC_KEY
+        sync: false
+      - key: PORT
+        value: 8000
