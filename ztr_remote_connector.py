@@ -490,18 +490,33 @@ def create_app():
         token = os.environ.get("ANTHROPIC_CHALLENGE_TOKEN", "")
         return JSONResponse({"challenge_token": token})
 
-    # --- Privacy & Terms (required for directory) ---
-    @app.get("/privacy")
+    # --- HTML Pages ---
+    from fastapi.responses import HTMLResponse
+    import pathlib
+
+    def read_html(filename: str) -> str:
+        """Read HTML file from same directory as this script."""
+        base = pathlib.Path(__file__).parent
+        path = base / filename
+        if path.exists():
+            return path.read_text(encoding='utf-8')
+        return f"<html><body><h1>{filename} not found</h1></body></html>"
+
+    @app.get("/", response_class=HTMLResponse)
+    async def homepage():
+        return HTMLResponse(content=read_html("index.html"))
+
+    @app.get("/privacy", response_class=HTMLResponse)
     async def privacy():
-        return JSONResponse({
-            "policy": "ZTR Privacy Policy",
-            "data_stored": "SHA-256 hash (64 chars), timestamp, user ID, review context",
-            "data_not_stored": "Document text, document content, any file or attachment",
-            "tsa_provider": "Aruba PEC (eIDAS qualified TSP)",
-            "data_retention": "Receipts stored indefinitely. TSA tokens archived 30 years by Aruba.",
-            "jurisdiction": "Italy / EU",
-            "contact": "zorthex.official@gmail.com",
-        })
+        return HTMLResponse(content=read_html("privacy.html"))
+
+    @app.get("/terms", response_class=HTMLResponse)
+    async def terms():
+        return HTMLResponse(content=read_html("terms.html"))
+
+    @app.get("/documentation", response_class=HTMLResponse)
+    async def documentation():
+        return HTMLResponse(content=read_html("docs.html"))
 
     return app
 
