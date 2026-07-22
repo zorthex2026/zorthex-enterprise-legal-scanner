@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zorthex Temporal Registry — Timestamp your AI verification</title>
+<meta name="description" content="ZTR creates contemporaneous records proving that human verification of AI-generated documents occurred. eIDAS-qualified timestamps. Document never stored.">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0a;color:#e0e0e0;font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh}
+
+nav{display:flex;justify-content:space-between;align-items:center;padding:20px 40px;border-bottom:1px solid #1a1a1a}
+.logo{font-weight:700;font-size:14px;color:#555;letter-spacing:2px}
+.logo span{color:#00d4aa}
+.nav-links{display:flex;gap:24px}
+.nav-links a{color:#777;font-size:12px;text-decoration:none}
+.nav-links a:hover{color:#00d4aa}
+
+.hero{max-width:700px;margin:80px auto 0;padding:0 24px;text-align:center}
+.hero-tag{font-size:11px;color:#00d4aa;letter-spacing:2px;text-transform:uppercase;margin-bottom:20px}
+h1{font-size:36px;font-weight:700;color:#fff;line-height:1.2;margin-bottom:16px}
+h1 span{color:#00d4aa}
+.hero-sub{font-size:15px;color:#999;line-height:1.7;max-width:520px;margin:0 auto 40px}
+
+.cta-group{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:60px}
+.cta-primary{background:#00d4aa;color:#0a0a0a;padding:12px 28px;border-radius:4px;font-size:13px;font-weight:600;text-decoration:none;letter-spacing:0.5px}
+.cta-secondary{border:1px solid #2a2a2a;color:#999;padding:12px 28px;border-radius:4px;font-size:13px;text-decoration:none}
+.cta-secondary:hover{border-color:#00d4aa;color:#00d4aa}
+
+.powered{font-size:11px;color:#444;margin-bottom:80px}
+.powered span{color:#555}
+
+.how{max-width:700px;margin:0 auto;padding:0 24px 80px}
+.how h2{font-size:18px;color:#fff;text-align:center;margin-bottom:40px}
+
+.steps{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:60px}
+.step{background:#111;border:1px solid #1a1a1a;border-radius:4px;padding:24px 20px;text-align:center}
+.step-num{font-size:28px;font-weight:700;color:#00d4aa;margin-bottom:12px}
+.step h3{font-size:13px;color:#fff;font-weight:600;margin-bottom:8px}
+.step p{font-size:12px;color:#888;line-height:1.6}
+
+.problem{background:#111;border:1px solid #1a1a1a;border-radius:4px;padding:32px;margin-bottom:40px}
+.problem h3{font-size:14px;color:#ffaa00;margin-bottom:12px}
+.problem p{font-size:13px;color:#bbb;line-height:1.7;margin-bottom:8px}
+.problem .source{font-size:11px;color:#555;font-style:italic}
+
+.features{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:60px}
+.feature{background:#111;border:1px solid #1a1a1a;border-radius:4px;padding:20px}
+.feature h3{font-size:13px;color:#00d4aa;margin-bottom:6px}
+.feature p{font-size:12px;color:#888;line-height:1.6}
+
+.not-features{background:#0a0f14;border:1px solid #1a2a3a;border-radius:4px;padding:24px;margin-bottom:60px}
+.not-features h3{font-size:13px;color:#4a9eff;margin-bottom:12px}
+.not-features ul{list-style:none;padding:0}
+.not-features li{font-size:12.5px;color:#90a8c0;padding:3px 0;padding-left:16px;position:relative}
+.not-features li:before{content:"✗";position:absolute;left:0;color:#ff4444;font-size:10px}
+
+footer{border-top:1px solid #1a1a1a;padding:24px 40px;text-align:center;font-size:11px;color:#444}
+footer a{color:#00d4aa;text-decoration:none}
+
+@media(max-width:600px){
+  .steps{grid-template-columns:1fr}
+  .features{grid-template-columns:1fr}
+  nav{padding:16px}
+  .nav-links{gap:16px}
+  h1{font-size:26px}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">TEMPORAL<span>REGISTRY</span></div>
+  <div class="nav-links">
+    <a href="/docs">Documentation</a>
+    <a href="/privacy">Privacy</a>
+    <a href="/terms">Terms</a>
+  </div>
+</nav>
+
+<div class="hero">
+  <div class="hero-tag">// Zorthex Temporal Registry · ZTR</div>
+  <h1>Timestamp your AI verification.<br><span>Prove it happened.</span></h1>
+  <p class="hero-sub">Courts are asking not whether you used AI, but whether you can demonstrate that verification occurred — and when. ZTR creates that proof.</p>
+
+  <div class="cta-group">
+    <a href="/docs" class="cta-primary">→ Read the Documentation</a>
+    <a href="/docs#install" class="cta-secondary">Install on Claude</a>
+  </div>
+
+  <div class="powered">A <span>Zorthex™</span> instrument · Powered by Claude · eIDAS-qualified timestamps via Aruba PEC</div>
+</div>
+
+<div class="how">
+
+  <div class="problem">
+    <h3>The problem ZTR solves</h3>
+    <p>In <em>Miller v. Regions Bank</em> (N.D. Alabama, 2026), a US federal court applied a two-track doctrine: the AI error received a public reprimand. The destruction of the ChatGPT account — the absence of any contemporaneous record — received adverse inference, contempt, and a six-month suspension.</p>
+    <p>The same pattern appeared in New York, in California (H.C. v. Contreras), and in the UK (CPS/Tobosaru, EWHC 2026). Four jurisdictions. One common thread: the system penalises the absence of a record more severely than the error itself.</p>
+    <p class="source">All cases documented at primary source level (PACER, BAILII, courts.ca.gov). L₂ research framework — zorthex.com</p>
+  </div>
+
+  <h2>How it works</h2>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">01</div>
+      <h3>You review the document</h3>
+      <p>You use Claude to draft or research a document. You apply your professional judgment.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">02</div>
+      <h3>ZTR timestamps the review</h3>
+      <p>Ask Claude to verify with ZTR. The document is hashed (SHA-256) and an eIDAS-qualified timestamp is recorded. Document never stored.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">03</div>
+      <h3>You receive a receipt</h3>
+      <p>A dated, immutable record: ZTR-20260720143022-a7f3c891. If ever asked whether you verified — you can prove it.</p>
+    </div>
+  </div>
+
+  <div class="features">
+    <div class="feature">
+      <h3>Document never stored</h3>
+      <p>The document is hashed and immediately discarded. Only 64 characters (the SHA-256 hash) are retained. Your content stays private.</p>
+    </div>
+    <div class="feature">
+      <h3>eIDAS-qualified timestamps</h3>
+      <p>Timestamps issued by Aruba PEC S.p.A., a Qualified Trust Service Provider under eIDAS. Legally presumed accurate across the EU and UK. RFC 3161 compliant.</p>
+    </div>
+    <div class="feature">
+      <h3>Audit trail built-in</h3>
+      <p>Every verification is stored with a receipt ID. Retrieve any past receipt instantly. Export your full verification history for compliance review.</p>
+    </div>
+    <div class="feature">
+      <h3>Works inside Claude</h3>
+      <p>ZTR is a Claude connector. No new software to install. No new workflow to learn. One command before filing.</p>
+    </div>
+  </div>
+
+  <div class="not-features">
+    <h3>What ZTR does NOT do</h3>
+    <ul>
+      <li>Does not verify document content or detect errors</li>
+      <li>Does not detect AI hallucinations (that requires on-premise tools)</li>
+      <li>Does not replace professional judgment</li>
+      <li>Does not guarantee compliance with any specific rule or standard</li>
+      <li>Does not store, read, or transmit the original document</li>
+    </ul>
+  </div>
+
+</div>
+
+<footer>
+  © 2026 Renato Santi — ZORTHEX™ (Trademark UIBM N.302026000090628) · Powered by Claude<br><br>
+  <a href="/docs">Documentation</a> · <a href="/privacy">Privacy Policy</a> · <a href="/terms">Terms of Service</a> · zorthex.official@gmail.com
+</footer>
+
+</body>
+</html>
