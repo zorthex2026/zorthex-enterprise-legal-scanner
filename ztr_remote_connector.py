@@ -29,7 +29,7 @@ DEPLOYMENT:
   Host: temporalregistry.com
   Stack: FastAPI + uvicorn
   Storage: SQLite (receipts)
-  TSA: Aruba PEC free TSA (same as capsule v1.2)
+  TSA: Aruba PEC qualified TSA (eIDAS, servizi.arubapec.it)
 
 © 2026 Renato Santi — ZORTHEX™ (Trademark UIBM N.302026000090628)
 Proprietary — All rights reserved.
@@ -454,13 +454,16 @@ def create_app():
         today_start = datetime.now(timezone.utc).strftime('%Y-%m-%dT00:00:00')
         today_receipts = store.list_by_user(user_id, date_from=today_start)
         if len(today_receipts) >= DAILY_QUOTA:
-            return JSONResponse({
-                "status": "QUOTA_EXCEEDED",
-                "message": (
-                    f"Technical preview fair-use quota reached "
-                    f"({DAILY_QUOTA} receipts/day). Quota resets at 00:00 UTC."
-                ),
-            })
+            return JSONResponse(
+                status_code=429,
+                content={
+                    "status": "QUOTA_EXCEEDED",
+                    "message": (
+                        f"Technical preview fair-use quota reached "
+                        f"({DAILY_QUOTA} receipts/day). Quota resets at 00:00 UTC."
+                    ),
+                },
+            )
 
         receipt = create_receipt(
             document_text=document_text,
@@ -574,6 +577,7 @@ def create_app():
 MCP_TOOL_DEFINITIONS = [
     {
         "name": "verify_document",
+        "title": "Verify Document",
         "description": (
             "[third_party_mcp_app] Zorthex Temporal Registry — Create a timestamped, "
             "eIDAS-qualified record proving that a human reviewed a document before use. "
@@ -608,9 +612,13 @@ MCP_TOOL_DEFINITIONS = [
             },
             "required": ["document_text"],
         },
+        "readOnlyHint": False,
+        "destructiveHint": False,
+        "openWorldHint": True,
     },
     {
         "name": "check_receipt",
+        "title": "Check Receipt",
         "description": (
             "[third_party_mcp_app] Zorthex Temporal Registry — Look up a verification "
             "receipt by ID. Returns hash, timestamp, TSA status, and reviewer identity."
@@ -625,9 +633,13 @@ MCP_TOOL_DEFINITIONS = [
             },
             "required": ["receipt_id"],
         },
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "openWorldHint": False,
     },
     {
         "name": "list_receipts",
+        "title": "List Receipts",
         "description": (
             "[third_party_mcp_app] Zorthex Temporal Registry — List your verification "
             "receipts. Filter by date range or review context."
@@ -641,6 +653,9 @@ MCP_TOOL_DEFINITIONS = [
             },
             "required": [],
         },
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "openWorldHint": False,
     },
 ]
 
