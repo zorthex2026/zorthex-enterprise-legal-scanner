@@ -449,6 +449,19 @@ def create_app():
         if len(document_text) > 5_000_000:  # 5MB limit
             raise HTTPException(413, "Document too large (max 5MB)")
 
+        # --- Daily quota check (BEFORE TSA call to protect marche) ---
+        DAILY_QUOTA = 10
+        today_start = datetime.now(timezone.utc).strftime('%Y-%m-%dT00:00:00')
+        today_receipts = store.list_by_user(user_id, date_from=today_start)
+        if len(today_receipts) >= DAILY_QUOTA:
+            return JSONResponse({
+                "status": "QUOTA_EXCEEDED",
+                "message": (
+                    f"Technical preview fair-use quota reached "
+                    f"({DAILY_QUOTA} receipts/day). Quota resets at 00:00 UTC."
+                ),
+            })
+
         receipt = create_receipt(
             document_text=document_text,
             user_id=user_id,
