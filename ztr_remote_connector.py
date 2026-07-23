@@ -133,35 +133,88 @@ def generate_receipt_id() -> str:
 
 def aruba_tsa_timestamp(doc_hash: str) -> dict:
     """
-    Request RFC 3161 timestamp using pure Python (rfc3161ng).
-    Primary: Aruba PEC free TSA (eIDAS qualified)
-    Fallback: FreeTSA.org (public TSA)
-    No subprocess, no openssl binary. Works on Render.
-    Version: 2026-07-23-v3
+    Request RFC 3161 timestamp from Aruba PEC QUALIFIED TSA (eIDAS).
+    Endpoint: https://servizi.arubapec.it/tsa/ngrequest.php
+    Algorithm: SHA-256
+    Auth: HTTP Basic (credentials from environment variables)
+    Fallback: FreeTSA.org (non-qualified, free)
+    Version: 2026-07-23-v4-qualified
     """
-    import rfc3161ng
     import requests as http_requests
+    from requests.auth import HTTPBasicAuth
+    from pyasn1.type import univ, namedtype
+    from pyasn1.codec.der import encoder
+    from pyasn1_modules import rfc2459
 
     hash_bytes = bytes.fromhex(doc_hash)
-    tsr = rfc3161ng.make_timestamp_request(data=hash_bytes)
 
-    endpoints = [
-        'https://freetsa.aruba.it/tsa/',
-        'https://freetsa.org/tsr',
-    ]
+    # --- Build RFC 3161 TimeStampReq with SHA-256 ---
+    sha256_oid = univ.ObjectIdentifier((2, 16, 840, 1, 101, 3, 4, 2, 1))
+
+    class MessageImprint(univ.Sequence):
+        componentType = namedtype.NamedTypes(
+            namedtype.NamedType('hashAlgorithm', rfc2459.AlgorithmIdentifier()),
+            namedtype.NamedType('hashedMessage', univ.OctetString())
+        )
+
+    class TimeStampReq(univ.Sequence):
+        componentType = namedtype.NamedTypes(
+            namedtype.NamedType('version', univ.Integer()),
+            namedtype.NamedType('messageImprint', MessageImprint()),
+            namedtype.OptionalNamedType('reqPolicy', univ.ObjectIdentifier()),
+            namedtype.OptionalNamedType('nonce', univ.Integer()),
+            namedtype.DefaultedNamedType('certReq', univ.Boolean(False))
+        )
+
+    algo = rfc2459.AlgorithmIdentifier()
+    algo['algorithm'] = sha256_oid
+
+    mi = MessageImprint()
+    mi['hashAlgorithm'] = algo
+    mi['hashedMessage'] = univ.OctetString(hash_bytes)
+
+    req = TimeStampReq()
+    req['version'] = univ.Integer(1)
+    req['messageImprint'] = mi
+    req['certReq'] = univ.Boolean(True)
+
+    tsr_bytes = encoder.encode(req)
+
+    # --- Try Aruba QUALIFIED first, then FreeTSA fallback ---
+    aruba_user = os.environ.get("ARUBA_TSA_USERNAME", "")
+    aruba_pass = os.environ.get("ARUBA_TSA_PASSWORD", "")
+
+    endpoints = []
+    if aruba_user and aruba_pass:
+        endpoints.append({
+            "url": "https://servizi.arubapec.it/tsa/ngrequest.php",
+            "auth": HTTPBasicAuth(aruba_user, aruba_pass),
+            "qualified": True,
+        })
+    endpoints.append({
+        "url": "https://freetsa.org/tsr",
+        "auth": None,
+        "qualified": False,
+    })
 
     last_error = None
-    for endpoint in endpoints:
+    for ep in endpoints:
         try:
             resp = http_requests.post(
-                endpoint,
-                data=tsr,
+                ep["url"],
+                data=tsr_bytes,
                 headers={'Content-Type': 'application/timestamp-query'},
+                auth=ep.get("auth"),
                 timeout=15,
             )
             if resp.status_code == 200:
                 token_b64 = base64.b64encode(resp.content).decode('ascii')
-                return {"token": token_b64, "status": "granted", "endpoint": endpoint}
+                return {
+                    "token": token_b64,
+                    "status": "granted",
+                    "endpoint": ep["url"],
+                    "qualified": ep["qualified"],
+                }
         except Exception as e:
             last_error = e
             continue
