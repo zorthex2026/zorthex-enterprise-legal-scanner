@@ -567,6 +567,23 @@ def create_app():
     async def documentation():
         return HTMLResponse(content=read_html("docs.html"))
 
+    from fastapi.responses import FileResponse
+
+    @app.get("/favicon.ico")
+    async def favicon():
+        base = pathlib.Path(__file__).parent
+        return FileResponse(base / "favicon.ico", media_type="image/x-icon")
+
+    @app.get("/favicon.png")
+    async def favicon_png():
+        base = pathlib.Path(__file__).parent
+        return FileResponse(base / "favicon.png", media_type="image/png")
+
+    @app.get("/favicon-192.png")
+    async def favicon_192():
+        base = pathlib.Path(__file__).parent
+        return FileResponse(base / "favicon-192.png", media_type="image/png")
+
     return app
 
 
