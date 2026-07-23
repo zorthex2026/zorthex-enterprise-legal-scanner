@@ -39,9 +39,8 @@ import hashlib
 import json
 import sqlite3
 import os
-import subprocess
 import base64
-import tempfile
+import requests
 from datetime import datetime, timezone
 from dataclasses import dataclass, asdict
 from typing import Optional, List
@@ -138,9 +137,11 @@ def aruba_tsa_timestamp(doc_hash: str) -> dict:
     Primary: Aruba PEC free TSA (eIDAS qualified)
     Fallback: FreeTSA.org (public TSA)
     No subprocess, no openssl binary. Works on Render.
+    Version: 2026-07-23-v3
     """
     import rfc3161ng
-import requests as http_requests
+    import requests as http_requests
+
     hash_bytes = bytes.fromhex(doc_hash)
     tsr = rfc3161ng.make_timestamp_request(data=hash_bytes)
 
