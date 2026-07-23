@@ -140,7 +140,7 @@ def aruba_tsa_timestamp(doc_hash: str) -> dict:
     No subprocess, no openssl binary. Works on Render.
     """
     import rfc3161ng
-
+import requests as http_requests
     hash_bytes = bytes.fromhex(doc_hash)
     tsr = rfc3161ng.make_timestamp_request(data=hash_bytes)
 
@@ -152,7 +152,7 @@ def aruba_tsa_timestamp(doc_hash: str) -> dict:
     last_error = None
     for endpoint in endpoints:
         try:
-            resp = requests.post(
+            resp = http_requests.post(
                 endpoint,
                 data=tsr,
                 headers={'Content-Type': 'application/timestamp-query'},
