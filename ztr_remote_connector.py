@@ -465,13 +465,26 @@ def create_app():
                 },
             )
 
+        # --- Global TSA budget check (protects personal wallet) ---
+        DAILY_TSA_BUDGET = 5  # max qualified timestamps per day, all users combined
+        use_tsa = True
+        with sqlite3.connect(store.db_path) as conn:
+            row = conn.execute(
+                """SELECT COUNT(*) FROM receipts
+                   WHERE tsa_status = 'VERIFIED'
+                   AND review_timestamp >= ?""",
+                (today_start,),
+            ).fetchone()
+            if row[0] >= DAILY_TSA_BUDGET:
+                use_tsa = False
+
         receipt = create_receipt(
             document_text=document_text,
             user_id=user_id,
             org_id=org_id,
             review_note=body.get("review_note", ""),
             context=body.get("context", "legal_filing"),
-            use_tsa=True,
+            use_tsa=use_tsa,
         )
         store.store(receipt)
 
@@ -600,7 +613,8 @@ MCP_TOOL_DEFINITIONS = [
             "eIDAS-qualified record proving that a human reviewed a document before use. "
             "The document is hashed (SHA-256) and immediately discarded — never stored or "
             "transmitted beyond the hash. Returns a verification receipt. Use this before "
-            "filing any AI-assisted legal document."
+            "filing, submitting, or approving any AI-assisted document — legal, medical, financial, "
+            "technical, or regulatory."
         ),
         "inputSchema": {
             "type": "object",
@@ -621,7 +635,14 @@ MCP_TOOL_DEFINITIONS = [
                     "type": "string",
                     "enum": [
                         "legal_filing", "contract_review", "legal_research",
-                        "client_advice", "regulatory_submission",
+                        "client_advice",
+                        "regulatory_submission", "audit_compliance",
+                        "medical_review", "clinical_assessment", "diagnostic_report",
+                        "credit_assessment", "risk_evaluation", "financial_report",
+                        "hr_decision", "recruitment_screening",
+                        "education_evaluation", "academic_review",
+                        "technical_review", "safety_assessment",
+                        "project_approval", "document_handover",
                         "internal_memo", "other",
                     ],
                     "default": "legal_filing",
