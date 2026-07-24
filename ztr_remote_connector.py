@@ -1041,9 +1041,12 @@ MCP_TOOL_DEFINITIONS = [
             },
             "required": ["document_text"],
         },
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "openWorldHint": True,
+        "annotations": {
+            "title": "Verify Document",
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "openWorldHint": True,
+        },
     },
     {
         "name": "check_receipt",
@@ -1062,9 +1065,12 @@ MCP_TOOL_DEFINITIONS = [
             },
             "required": ["receipt_id"],
         },
-        "readOnlyHint": True,
-        "destructiveHint": False,
-        "openWorldHint": False,
+        "annotations": {
+            "title": "Check Receipt",
+            "readOnlyHint": True,
+            "destructiveHint": False,
+            "openWorldHint": False,
+        },
     },
     {
         "name": "list_receipts",
@@ -1082,9 +1088,12 @@ MCP_TOOL_DEFINITIONS = [
             },
             "required": [],
         },
-        "readOnlyHint": True,
-        "destructiveHint": False,
-        "openWorldHint": False,
+        "annotations": {
+            "title": "List Receipts",
+            "readOnlyHint": True,
+            "destructiveHint": False,
+            "openWorldHint": False,
+        },
     },
 ]
 
