@@ -40,6 +40,7 @@ import json
 import sqlite3
 import os
 import base64
+import uuid
 import requests
 from datetime import datetime, timezone
 from dataclasses import dataclass, asdict
@@ -581,6 +582,377 @@ def create_app():
         return HTMLResponse(content=read_html("docs.html"))
 
     from fastapi.responses import FileResponse
+
+    # ================================================================
+    # OAUTH 2.0 — Simplified for Claude Connectors Directory
+    # ================================================================
+
+    # Token store in SQLite (same DB as receipts)
+    with sqlite3.connect(store.db_path) as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS oauth_tokens (
+                token TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                client_id TEXT NOT NULL,
+                code TEXT,
+                created_at TEXT DEFAULT (datetime('now')),
+                expires_at TEXT
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS oauth_codes (
+                code TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                client_id TEXT NOT NULL,
+                redirect_uri TEXT,
+                created_at TEXT DEFAULT (datetime('now')),
+                used INTEGER DEFAULT 0
+            )
+        """)
+
+    ZTR_CLIENT_ID = "ztr-claude-connector"
+    ZTR_SERVER_URL = os.environ.get("ZTR_SERVER_URL", "https://temporalregistry.com")
+
+    @app.get("/.well-known/oauth-authorization-server")
+    async def oauth_discovery():
+        """OAuth 2.0 Authorization Server Metadata (RFC 8414)"""
+        return JSONResponse({
+            "issuer": ZTR_SERVER_URL,
+            "authorization_endpoint": f"{ZTR_SERVER_URL}/oauth/authorize",
+            "token_endpoint": f"{ZTR_SERVER_URL}/oauth/token",
+            "response_types_supported": ["code"],
+            "grant_types_supported": ["authorization_code"],
+            "code_challenge_methods_supported": ["S256"],
+            "token_endpoint_auth_methods_supported": ["none"],
+        })
+
+    @app.get("/oauth/authorize")
+    async def oauth_authorize(
+        response_type: str = "code",
+        client_id: str = "",
+        redirect_uri: str = "",
+        state: str = "",
+        scope: str = "",
+        code_challenge: str = "",
+        code_challenge_method: str = "",
+    ):
+        """
+        OAuth authorize endpoint.
+        Shows a minimal consent page, then redirects back to Claude
+        with an authorization code.
+        """
+        from fastapi.responses import HTMLResponse
+        import urllib.parse
+
+        if not redirect_uri:
+            redirect_uri = "https://claude.ai/api/mcp/auth_callback"
+
+        # Generate auth code
+        code = str(uuid.uuid4())
+
+        # Store the code
+        with sqlite3.connect(store.db_path) as conn:
+            conn.execute(
+                """INSERT INTO oauth_codes (code, user_id, client_id, redirect_uri)
+                   VALUES (?, ?, ?, ?)""",
+                (code, "oauth-user", client_id or ZTR_CLIENT_ID, redirect_uri)
+            )
+
+        # Build consent page
+        consent_html = f"""
+        <!DOCTYPE html>
+        <html><head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>ZTR — Authorize</title>
+        <style>
+            body{{background:#0a0a0a;color:#f0ede6;font-family:'Inter',system-ui,sans-serif;
+                  display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0}}
+            .card{{background:#161616;border:1px solid #222;border-radius:8px;padding:40px;
+                   max-width:400px;text-align:center}}
+            h1{{font-size:20px;margin-bottom:8px;color:#c9a84c}}
+            p{{font-size:14px;color:#999;line-height:1.6;margin-bottom:24px}}
+            .perms{{text-align:left;background:#111;border:1px solid #222;border-radius:4px;
+                    padding:16px;margin-bottom:24px;font-size:13px;color:#bbb}}
+            .perms div{{padding:4px 0}}
+            .btn{{display:inline-block;background:#c9a84c;color:#0a0a0a;padding:12px 32px;
+                  border:none;border-radius:4px;font-size:14px;font-weight:600;cursor:pointer;
+                  text-decoration:none;letter-spacing:0.5px}}
+            .btn:hover{{background:#e8c97a}}
+        </style>
+        </head><body>
+        <div class="card">
+            <h1>Zorthex Temporal Registry</h1>
+            <p>Claude is requesting access to create and retrieve verification receipts on your behalf.</p>
+            <div class="perms">
+                <div>✓ Create verification receipts (hash + timestamp)</div>
+                <div>✓ Retrieve your past receipts</div>
+                <div>✗ Access to your documents (never stored)</div>
+            </div>
+            <a class="btn" href="/oauth/callback?code={code}&state={urllib.parse.quote(state)}&redirect_uri={urllib.parse.quote(redirect_uri)}">
+                Authorize ZTR
+            </a>
+        </div>
+        </body></html>
+        """
+        return HTMLResponse(content=consent_html)
+
+    @app.get("/oauth/callback")
+    async def oauth_callback(code: str, state: str = "", redirect_uri: str = ""):
+        """Internal callback that redirects to Claude with the auth code."""
+        from fastapi.responses import RedirectResponse
+        import urllib.parse
+
+        if not redirect_uri:
+            redirect_uri = "https://claude.ai/api/mcp/auth_callback"
+
+        separator = "&" if "?" in redirect_uri else "?"
+        target = f"{redirect_uri}{separator}code={code}"
+        if state:
+            target += f"&state={urllib.parse.quote(state)}"
+
+        return RedirectResponse(url=target)
+
+    @app.post("/oauth/token")
+    async def oauth_token(request: Request):
+        """Exchange authorization code for access token."""
+        body = await request.form()
+        grant_type = body.get("grant_type", "")
+        code = body.get("code", "")
+
+        if grant_type != "authorization_code":
+            raise HTTPException(400, "unsupported grant_type")
+
+        # Validate code
+        with sqlite3.connect(store.db_path) as conn:
+            row = conn.execute(
+                "SELECT user_id, client_id FROM oauth_codes WHERE code = ? AND used = 0",
+                (code,)
+            ).fetchone()
+
+            if not row:
+                raise HTTPException(400, "invalid or expired code")
+
+            user_id, client_id = row
+
+            # Mark code as used
+            conn.execute("UPDATE oauth_codes SET used = 1 WHERE code = ?", (code,))
+
+            # Generate access token
+            token = str(uuid.uuid4())
+            conn.execute(
+                """INSERT INTO oauth_tokens (token, user_id, client_id)
+                   VALUES (?, ?, ?)""",
+                (token, user_id, client_id)
+            )
+
+        return JSONResponse({
+            "access_token": token,
+            "token_type": "Bearer",
+            "scope": "verify:read verify:write",
+        })
+
+    def get_user_from_token(request: Request) -> str:
+        """Extract user_id from OAuth Bearer token or X-User-ID header."""
+        auth = request.headers.get("Authorization", "")
+        if auth.startswith("Bearer "):
+            token = auth[7:]
+            with sqlite3.connect(store.db_path) as conn:
+                row = conn.execute(
+                    "SELECT user_id FROM oauth_tokens WHERE token = ?", (token,)
+                ).fetchone()
+                if row:
+                    return row[0]
+        # Fallback to X-User-ID header (for testing / backward compatibility)
+        return request.headers.get("X-User-ID", "anonymous")
+
+    # ================================================================
+    # MCP PROTOCOL — JSON-RPC over Streamable HTTP
+    # ================================================================
+
+    @app.post("/mcp")
+    async def mcp_jsonrpc(request: Request):
+        """
+        MCP Streamable HTTP endpoint.
+        Receives JSON-RPC 2.0 messages and routes to tool handlers.
+        Methods: initialize, tools/list, tools/call
+        """
+        body = await request.json()
+        method = body.get("method", "")
+        params = body.get("params", {})
+        msg_id = body.get("id")
+        user_id = get_user_from_token(request)
+
+        # --- initialize ---
+        if method == "initialize":
+            return JSONResponse({
+                "jsonrpc": "2.0",
+                "id": msg_id,
+                "result": {
+                    "protocolVersion": "2025-03-26",
+                    "serverInfo": {
+                        "name": "Zorthex Temporal Registry",
+                        "version": "0.1",
+                    },
+                    "capabilities": {
+                        "tools": {"listChanged": False},
+                    },
+                },
+            })
+
+        # --- tools/list ---
+        if method == "tools/list":
+            return JSONResponse({
+                "jsonrpc": "2.0",
+                "id": msg_id,
+                "result": {
+                    "tools": MCP_TOOL_DEFINITIONS,
+                },
+            })
+
+        # --- tools/call ---
+        if method == "tools/call":
+            tool_name = params.get("name", "")
+            arguments = params.get("arguments", {})
+
+            try:
+                if tool_name == "verify_document":
+                    result = await _handle_verify(arguments, user_id, store)
+                elif tool_name == "check_receipt":
+                    result = await _handle_check(arguments, store)
+                elif tool_name == "list_receipts":
+                    result = await _handle_list(arguments, user_id, store)
+                else:
+                    return JSONResponse({
+                        "jsonrpc": "2.0",
+                        "id": msg_id,
+                        "error": {"code": -32601, "message": f"Unknown tool: {tool_name}"},
+                    })
+
+                return JSONResponse({
+                    "jsonrpc": "2.0",
+                    "id": msg_id,
+                    "result": {
+                        "content": [{"type": "text", "text": json.dumps(result)}],
+                    },
+                })
+
+            except Exception as e:
+                return JSONResponse({
+                    "jsonrpc": "2.0",
+                    "id": msg_id,
+                    "error": {"code": -32000, "message": str(e)},
+                })
+
+        # --- Unknown method ---
+        return JSONResponse({
+            "jsonrpc": "2.0",
+            "id": msg_id,
+            "error": {"code": -32601, "message": f"Unknown method: {method}"},
+        })
+
+    @app.get("/mcp")
+    async def mcp_discovery(request: Request):
+        """MCP discovery — returns Link header for OAuth."""
+        from fastapi.responses import Response
+        return Response(
+            content="",
+            status_code=200,
+            headers={
+                "Link": f'<{ZTR_SERVER_URL}/oauth/authorize>; rel="authorization"',
+            },
+        )
+
+    # --- MCP Tool Handlers (shared between REST and JSON-RPC) ---
+
+    async def _handle_verify(arguments: dict, user_id: str, store: ReceiptStore) -> dict:
+        """Handle verify_document tool call."""
+        document_text = arguments.get("document_text", "")
+        if not document_text:
+            raise ValueError("document_text is required")
+        if len(document_text) > 5_000_000:
+            raise ValueError("Document too large (max 5MB)")
+
+        # Daily quota check
+        DAILY_QUOTA = 10
+        today_start = datetime.now(timezone.utc).strftime('%Y-%m-%dT00:00:00')
+        today_receipts = store.list_by_user(user_id, date_from=today_start)
+        if len(today_receipts) >= DAILY_QUOTA:
+            return {
+                "status": "QUOTA_EXCEEDED",
+                "message": f"Technical preview fair-use quota reached ({DAILY_QUOTA} receipts/day). Quota resets at 00:00 UTC.",
+            }
+
+        # Global TSA budget check
+        DAILY_TSA_BUDGET = 5
+        use_tsa = True
+        with sqlite3.connect(store.db_path) as conn:
+            row = conn.execute(
+                """SELECT COUNT(*) FROM receipts
+                   WHERE tsa_status = 'VERIFIED'
+                   AND review_timestamp >= ?""",
+                (today_start,),
+            ).fetchone()
+            if row[0] >= DAILY_TSA_BUDGET:
+                use_tsa = False
+
+        receipt = create_receipt(
+            document_text=document_text,
+            user_id=user_id,
+            org_id="",
+            review_note=arguments.get("review_note", ""),
+            context=arguments.get("context", "legal_filing"),
+            use_tsa=use_tsa,
+        )
+        store.store(receipt)
+
+        return {
+            "receipt_id": receipt.receipt_id,
+            "document_sha256": receipt.document_sha256,
+            "review_timestamp": receipt.review_timestamp,
+            "tsa_status": receipt.tsa_status,
+            "integrity_hmac": receipt.integrity_hmac[:16] + "...",
+            "context": receipt.context,
+            "message": (
+                f"Verification recorded. Receipt: {receipt.receipt_id}. "
+                f"Hash: {receipt.document_sha256[:16]}... "
+                f"Time: {receipt.review_timestamp}. "
+                f"TSA: {receipt.tsa_status}. "
+                f"Document was not stored."
+            ),
+        }
+
+    async def _handle_check(arguments: dict, store: ReceiptStore) -> dict:
+        """Handle check_receipt tool call."""
+        receipt_id = arguments.get("receipt_id", "")
+        if not receipt_id:
+            raise ValueError("receipt_id is required")
+
+        receipt = store.get(receipt_id)
+        if not receipt:
+            raise ValueError(f"Receipt {receipt_id} not found")
+
+        result = dict(receipt)
+        if result.get("tsa_token"):
+            result["tsa_token"] = result["tsa_token"][:32] + "...(truncated)"
+        return result
+
+    async def _handle_list(arguments: dict, user_id: str, store: ReceiptStore) -> dict:
+        """Handle list_receipts tool call."""
+        receipts = store.list_by_user(
+            user_id=user_id,
+            date_from=arguments.get("date_from"),
+            date_to=arguments.get("date_to"),
+            context=arguments.get("context"),
+        )
+        for r in receipts:
+            if r.get("tsa_token"):
+                r["tsa_token"] = "(stored)"
+        return {"count": len(receipts), "receipts": receipts}
+
+    # ================================================================
+    # FAVICON ROUTES
+    # ================================================================
 
     @app.get("/favicon.ico")
     async def favicon():
