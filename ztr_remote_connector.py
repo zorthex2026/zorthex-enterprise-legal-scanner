@@ -716,39 +716,58 @@ def create_app():
     @app.post("/oauth/token")
     async def oauth_token(request: Request):
         """Exchange authorization code for access token."""
-        body = await request.form()
+        # Handle both form-urlencoded and JSON
+        content_type = request.headers.get("content-type", "")
+        try:
+            if "json" in content_type:
+                body = await request.json()
+            else:
+                form = await request.form()
+                body = dict(form)
+        except Exception:
+            raise HTTPException(400, "Could not parse request body")
+
         grant_type = body.get("grant_type", "")
         code = body.get("code", "")
 
         if grant_type != "authorization_code":
             raise HTTPException(400, "unsupported grant_type")
 
+        if not code:
+            raise HTTPException(400, "code is required")
+
         # Validate code
-        with sqlite3.connect(store.db_path) as conn:
-            row = conn.execute(
-                "SELECT user_id, client_id FROM oauth_codes WHERE code = ? AND used = 0",
-                (code,)
-            ).fetchone()
+        try:
+            with sqlite3.connect(store.db_path) as conn:
+                row = conn.execute(
+                    "SELECT user_id, client_id FROM oauth_codes WHERE code = ? AND used = 0",
+                    (code,)
+                ).fetchone()
 
-            if not row:
-                raise HTTPException(400, "invalid or expired code")
+                if not row:
+                    raise HTTPException(400, "invalid or expired code")
 
-            user_id, client_id = row
+                user_id, client_id = row
 
-            # Mark code as used
-            conn.execute("UPDATE oauth_codes SET used = 1 WHERE code = ?", (code,))
+                # Mark code as used
+                conn.execute("UPDATE oauth_codes SET used = 1 WHERE code = ?", (code,))
 
-            # Generate access token
-            token = str(uuid.uuid4())
-            conn.execute(
-                """INSERT INTO oauth_tokens (token, user_id, client_id)
-                   VALUES (?, ?, ?)""",
-                (token, user_id, client_id)
-            )
+                # Generate access token
+                token = str(uuid.uuid4())
+                conn.execute(
+                    """INSERT INTO oauth_tokens (token, user_id, client_id)
+                       VALUES (?, ?, ?)""",
+                    (token, user_id, client_id)
+                )
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(500, f"Token generation failed: {str(e)}")
 
         return JSONResponse({
             "access_token": token,
-            "token_type": "Bearer",
+            "token_type": "bearer",
+            "expires_in": 3600,
             "scope": "verify:read verify:write",
         })
 
