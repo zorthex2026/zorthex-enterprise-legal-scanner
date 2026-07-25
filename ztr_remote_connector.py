@@ -841,6 +841,8 @@ def create_app():
                     result = await _handle_check(arguments, store)
                 elif tool_name == "list_receipts":
                     result = await _handle_list(arguments, user_id, store)
+                elif tool_name == "download_receipt_pdf":
+                    result = await _handle_download_pdf(arguments, store)
                 else:
                     return JSONResponse({
                         "jsonrpc": "2.0",
@@ -969,6 +971,52 @@ def create_app():
                 r["tsa_token"] = "(stored)"
         return {"count": len(receipts), "receipts": receipts}
 
+    async def _handle_download_pdf(arguments: dict, store: ReceiptStore) -> dict:
+        """Handle download_receipt_pdf tool call — returns URL to download."""
+        receipt_id = arguments.get("receipt_id", "")
+        if not receipt_id:
+            raise ValueError("receipt_id is required")
+        receipt = store.get(receipt_id)
+        if not receipt:
+            raise ValueError(f"Receipt {receipt_id} not found")
+        return {
+            "receipt_id": receipt_id,
+            "download_url": f"{ZTR_SERVER_URL}/receipt/{receipt_id}/pdf",
+            "message": f"PDF receipt available for download at: {ZTR_SERVER_URL}/receipt/{receipt_id}/pdf",
+        }
+
+    # ================================================================
+    # PDF DOWNLOAD ENDPOINT
+    # ================================================================
+
+    @app.get("/receipt/{receipt_id}/pdf")
+    async def download_receipt_pdf(receipt_id: str):
+        """Download a professional PDF receipt for a verification record."""
+        receipt = store.get(receipt_id)
+        if not receipt:
+            raise HTTPException(404, f"Receipt {receipt_id} not found")
+
+        import tempfile
+        from ztr_receipt_pdf import create_receipt_pdf
+
+        tmp = tempfile.NamedTemporaryFile(suffix='.pdf', delete=False)
+        create_receipt_pdf(
+            output_path=tmp.name,
+            receipt_id=receipt['receipt_id'],
+            document_sha256=receipt['document_sha256'],
+            review_timestamp=receipt['review_timestamp'],
+            review_note=receipt.get('review_note', ''),
+            context=receipt.get('context', 'other'),
+            user_id=receipt['user_id'],
+            tsa_status=receipt['tsa_status'],
+            integrity_hmac=receipt.get('integrity_hmac', ''),
+        )
+        return FileResponse(
+            tmp.name,
+            media_type='application/pdf',
+            filename=f'{receipt_id}.pdf',
+        )
+
     # ================================================================
     # FAVICON ROUTES
     # ================================================================
@@ -1090,6 +1138,31 @@ MCP_TOOL_DEFINITIONS = [
         },
         "annotations": {
             "title": "List Receipts",
+            "readOnlyHint": True,
+            "destructiveHint": False,
+            "openWorldHint": False,
+        },
+    },
+    {
+        "name": "download_receipt_pdf",
+        "title": "Download Receipt PDF",
+        "description": (
+            "[third_party_mcp_app] Zorthex Temporal Registry — Download a professional PDF "
+            "receipt for a verification record. Includes QR code for independent verification, "
+            "full hash, eIDAS timestamp details, and legal disclaimer."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "receipt_id": {
+                    "type": "string",
+                    "description": "Receipt ID (format: ZTR-YYYYMMDDHHMMSS-XXXXXXXX)",
+                },
+            },
+            "required": ["receipt_id"],
+        },
+        "annotations": {
+            "title": "Download Receipt PDF",
             "readOnlyHint": True,
             "destructiveHint": False,
             "openWorldHint": False,
