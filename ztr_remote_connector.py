@@ -1018,6 +1018,40 @@ def create_app():
         )
 
     # ================================================================
+    # ADMIN STATS (protected)
+    # ================================================================
+
+    @app.get("/admin/stats")
+    async def admin_stats(request: Request):
+        key = request.query_params.get("key", "")
+        admin_key = os.environ.get("ZTR_ADMIN_KEY", "ztr-admin-2026")
+        if key != admin_key:
+            raise HTTPException(403, "Unauthorized")
+
+        with sqlite3.connect(store.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+
+            total = conn.execute("SELECT COUNT(*) as c FROM receipts").fetchone()["c"]
+            verified = conn.execute("SELECT COUNT(*) as c FROM receipts WHERE tsa_status='VERIFIED'").fetchone()["c"]
+            users = conn.execute("SELECT COUNT(DISTINCT user_id) as c FROM receipts").fetchone()["c"]
+
+            recent = [dict(r) for r in conn.execute(
+                """SELECT receipt_id, user_id, context, tsa_status,
+                   review_timestamp, review_note
+                   FROM receipts ORDER BY review_timestamp DESC LIMIT 20"""
+            ).fetchall()]
+
+            for r in recent:
+                r.pop('tsa_token', None)
+
+            return JSONResponse({
+                "total_receipts": total,
+                "verified_receipts": verified,
+                "unique_users": users,
+                "recent": recent,
+            })
+
+    # ================================================================
     # FAVICON ROUTES
     # ================================================================
 
