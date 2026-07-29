@@ -402,7 +402,7 @@ def create_app():
     from fastapi.middleware.cors import CORSMiddleware
 
     app = FastAPI(
-        title="Zorthex Temporal Registry",
+        title="ZTR — Temporal Registry",
         description=(
             "Verification timestamping for AI-assisted legal work. "
             "Creates contemporaneous records proving that human review occurred. "
@@ -682,7 +682,7 @@ def create_app():
         </style>
         </head><body>
         <div class="card">
-            <h1>Zorthex Temporal Registry</h1>
+            <h1>ZTR — Temporal Registry</h1>
             <p>Claude is requesting access to create and retrieve verification receipts on your behalf.</p>
             <div class="perms">
                 <div>✓ Create verification receipts (hash + timestamp)</div>
@@ -810,7 +810,7 @@ def create_app():
                 "result": {
                     "protocolVersion": "2025-03-26",
                     "serverInfo": {
-                        "name": "Zorthex Temporal Registry",
+                        "name": "ZTR — Temporal Registry",
                         "version": "0.1",
                     },
                     "capabilities": {
@@ -1065,6 +1065,11 @@ def create_app():
         base = pathlib.Path(__file__).parent
         return FileResponse(base / "favicon.png", media_type="image/png")
 
+    @app.get("/icon.png")
+    async def icon_png():
+        base = pathlib.Path(__file__).parent
+        return FileResponse(base / "favicon.png", media_type="image/png")
+
     @app.get("/favicon-192.png")
     async def favicon_192():
         base = pathlib.Path(__file__).parent
@@ -1082,11 +1087,13 @@ MCP_TOOL_DEFINITIONS = [
         "name": "verify_document",
         "title": "Verify Document",
         "description": (
-            "[third_party_mcp_app] Zorthex Temporal Registry — Create a timestamped, "
-            "eIDAS-qualified record proving that a human reviewed a document before use. "
-            "The document is hashed (SHA-256) and immediately discarded — never stored or "
-            "transmitted beyond the hash. Returns a verification receipt. Use this before "
-            "filing, submitting, or approving any AI-assisted document — legal, medical, financial, "
+            "[third_party_mcp_app] ZTR — Temporal Registry — Create a timestamped "
+            "record of human verification for an AI-assisted document. The document is "
+            "hashed (SHA-256), the professional's declaration is timestamped via an "
+            "eIDAS-qualified TSA (Aruba PEC S.p.A.), and a retrievable receipt with HMAC "
+            "integrity seal is returned. The document is immediately discarded — never "
+            "stored or transmitted beyond the hash. Use this before filing, submitting, "
+            "or approving any AI-assisted document — legal, medical, financial, "
             "technical, or regulatory."
         ),
         "inputSchema": {
@@ -1134,7 +1141,7 @@ MCP_TOOL_DEFINITIONS = [
         "name": "check_receipt",
         "title": "Check Receipt",
         "description": (
-            "[third_party_mcp_app] Zorthex Temporal Registry — Look up a verification "
+            "[third_party_mcp_app] ZTR — Temporal Registry — Look up a verification "
             "receipt by ID. Returns hash, timestamp, TSA status, and reviewer identity."
         ),
         "inputSchema": {
@@ -1158,7 +1165,7 @@ MCP_TOOL_DEFINITIONS = [
         "name": "list_receipts",
         "title": "List Receipts",
         "description": (
-            "[third_party_mcp_app] Zorthex Temporal Registry — List your verification "
+            "[third_party_mcp_app] ZTR — Temporal Registry — List your verification "
             "receipts. Filter by date range or review context."
         ),
         "inputSchema": {
@@ -1181,7 +1188,7 @@ MCP_TOOL_DEFINITIONS = [
         "name": "download_receipt_pdf",
         "title": "Download Receipt PDF",
         "description": (
-            "[third_party_mcp_app] Zorthex Temporal Registry — Download a professional PDF "
+            "[third_party_mcp_app] ZTR — Temporal Registry — Download a professional PDF "
             "receipt for a verification record. Includes QR code for independent verification, "
             "full hash, eIDAS timestamp details, and legal disclaimer."
         ),
