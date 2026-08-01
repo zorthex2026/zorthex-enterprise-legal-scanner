@@ -241,6 +241,11 @@ def create_receipt_pdf(
         "Only this 64-character fingerprint was recorded.",
         styles['Disclaimer']
     ))
+    story.append(Paragraph(
+        "Hash computed on verified text content — same content produces "
+        "same hash regardless of file format (PDF, DOCX, email).",
+        styles['Disclaimer']
+    ))
     story.append(Spacer(1, 3*mm))
 
     # --- REVIEWER DECLARATION ---
