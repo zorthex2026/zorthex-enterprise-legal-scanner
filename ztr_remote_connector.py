@@ -585,6 +585,43 @@ def create_app():
     async def cases():
         return HTMLResponse(content=read_html("cases.html"))
 
+    @app.get("/feedback", response_class=HTMLResponse)
+    async def feedback_page():
+        return HTMLResponse(content=read_html("feedback.html"))
+
+    @app.post("/api/feedback")
+    async def submit_feedback(request: Request):
+        body = await request.json()
+        with sqlite3.connect(store.db_path) as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS feedback (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    used_real TEXT DEFAULT '',
+                    pdf_feedback TEXT DEFAULT '',
+                    pricing_feedback TEXT DEFAULT '',
+                    email TEXT DEFAULT '',
+                    created_at TEXT DEFAULT (datetime('now'))
+                )
+            """)
+            conn.execute(
+                """INSERT INTO feedback (used_real, pdf_feedback, pricing_feedback, email) VALUES (?, ?, ?, ?)""",
+                (body.get("used_real", ""), body.get("pdf_feedback", ""), body.get("pricing_feedback", ""), body.get("email", ""))
+            )
+        return JSONResponse({"status": "ok", "message": "Thank you for your feedback."})
+
+    @app.get("/admin/feedback")
+    async def admin_feedback(request: Request):
+        key = request.query_params.get("key", "")
+        admin_key = os.environ.get("ZTR_ADMIN_KEY", "ztr-admin-2026")
+        if key != admin_key:
+            raise HTTPException(403, "Unauthorized")
+        with sqlite3.connect(store.db_path) as conn:
+            rows = conn.execute(
+                "SELECT id, used_real, pdf_feedback, pricing_feedback, email, created_at FROM feedback ORDER BY created_at DESC"
+            ).fetchall()
+        feedback_list = [{"id": r[0], "used_real": r[1], "pdf_feedback": r[2], "pricing": r[3], "email": r[4], "date": r[5]} for r in rows]
+        return JSONResponse({"total": len(feedback_list), "feedback": feedback_list})
+
     from fastapi.responses import FileResponse
 
     # ================================================================
@@ -931,7 +968,7 @@ def create_app():
         )
         store.store(receipt)
 
-        return {
+        result = {
             "receipt_id": receipt.receipt_id,
             "document_sha256": receipt.document_sha256,
             "review_timestamp": receipt.review_timestamp,
@@ -946,6 +983,17 @@ def create_app():
                 f"Document was not stored."
             ),
         }
+
+        # Welcome message on first receipt
+        user_count = store.count_by_user(user_id)
+        if user_count == 1:
+            result["welcome_message"] = (
+                "Welcome to ZTR Early Access. Your verification has been recorded "
+                "with an eIDAS-qualified timestamp by Aruba PEC S.p.A. "
+                "We'd appreciate your feedback: temporalregistry.com/feedback"
+            )
+
+        return result
 
     async def _handle_check(arguments: dict, store: ReceiptStore) -> dict:
         """Handle check_receipt tool call."""
