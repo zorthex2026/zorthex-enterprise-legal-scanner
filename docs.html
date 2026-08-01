@@ -131,6 +131,7 @@ Claude: [calls list_receipts with date_from filter]
 
 <h3>Hashing</h3>
 <p>Documents are hashed using SHA-256 (Python hashlib). The hash is a one-way mathematical fingerprint — it cannot be reversed to recover the document. Only the 64-character hexadecimal hash is stored.</p>
+<p>ZTR hashes the text content of the document, not the file container (PDF, DOCX, etc.). This is by design: the same professional opinion produces the same hash regardless of file format, ensuring that the verification is tied to the substance reviewed, not to its packaging.</p>
 
 <h3>Timestamps</h3>
 <p>Standard receipts include a server timestamp (ISO 8601 UTC). eIDAS-qualified timestamps are provided via Aruba PEC S.p.A., a Qualified Trust Service Provider under eIDAS Regulation (EU) 910/2014. eIDAS timestamps are RFC 3161 compliant and legally presumed accurate across the EU and UK.</p>
