@@ -96,6 +96,14 @@ nav{padding:16px 20px}.nav-links{gap:16px}
 .cta-section{padding:0 20px}
 footer{padding:32px 20px;flex-direction:column;align-items:flex-start}
 }
+@keyframes borderPulse {
+  0%,100%{border-top-color:rgba(212,170,76,0.3);box-shadow:0 -2px 8px rgba(212,170,76,0)}
+  50%{border-top-color:rgba(212,170,76,1);box-shadow:0 -2px 12px rgba(212,170,76,0.3)}
+}
+@keyframes btnGlow {
+  0%,100%{box-shadow:0 0 4px rgba(212,170,76,0.2)}
+  50%{box-shadow:0 0 16px rgba(212,170,76,0.5),0 0 4px rgba(212,170,76,0.3)}
+}
 </style>
 </head>
 <body>
@@ -315,17 +323,6 @@ footer{padding:32px 20px;flex-direction:column;align-items:flex-start}
             text-decoration:none;font-weight:bold;font-size:0.85rem;border-radius:4px;
             animation:btnGlow 3s ease-in-out infinite;">Install Now</a>
 </div>
-
-<style>
-@keyframes borderPulse {
-  0%,100%{border-top-color:rgba(212,170,76,0.3);box-shadow:0 -2px 8px rgba(212,170,76,0)}
-  50%{border-top-color:rgba(212,170,76,1);box-shadow:0 -2px 12px rgba(212,170,76,0.3)}
-}
-@keyframes btnGlow {
-  0%,100%{box-shadow:0 0 4px rgba(212,170,76,0.2)}
-  50%{box-shadow:0 0 16px rgba(212,170,76,0.5),0 0 4px rgba(212,170,76,0.3)}
-}
-</style>
 
 <script>
 const hero=document.querySelector('.hero');
