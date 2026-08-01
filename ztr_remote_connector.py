@@ -593,6 +593,75 @@ def create_app():
     async def feedback_page():
         return HTMLResponse(content=read_html("feedback.html"))
 
+    @app.get("/verify", response_class=HTMLResponse)
+    async def verify_page():
+        return HTMLResponse(content=read_html("verify.html"))
+
+    @app.get("/verify/{receipt_id}")
+    async def verify_receipt(receipt_id: str):
+        """Public verification endpoint - no auth required."""
+        with sqlite3.connect(store.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(
+                """SELECT receipt_id, document_sha256, context,
+                          tsa_status, review_timestamp
+                   FROM receipts WHERE receipt_id = ?""",
+                (receipt_id,)
+            ).fetchone()
+        if not row:
+            return JSONResponse(
+                {"status": "NOT_FOUND", "message": "No receipt found with this ID."},
+                status_code=404
+            )
+        return JSONResponse({
+            "status": "FOUND",
+            "receipt": {
+                "receipt_id": row["receipt_id"],
+                "document_hash": row["document_sha256"],
+                "context": row["context"],
+                "tsa_status": row["tsa_status"],
+                "timestamp": row["review_timestamp"],
+            },
+            "verification_note": (
+                "This receipt confirms that a professional declared "
+                "they had reviewed the specified content at the stated "
+                "time. The timestamp was issued by Aruba PEC S.p.A., "
+                "a Qualified Trust Service Provider under EU Regulation "
+                "910/2014 (eIDAS). The document hash (SHA-256) was "
+                "computed on the verified text content — same content "
+                "produces the same hash regardless of file format."
+            ),
+        })
+
+    @app.post("/verify/check-hash")
+    async def verify_hash(request: Request):
+        """Check if a document hash matches any receipt — public, no auth."""
+        body = await request.json()
+        doc_hash = body.get("hash", "").strip()
+        if not doc_hash:
+            raise HTTPException(400, "hash is required")
+        with sqlite3.connect(store.db_path) as conn:
+            rows = conn.execute(
+                """SELECT receipt_id, tsa_status,
+                          review_timestamp, context
+                   FROM receipts WHERE document_sha256 = ?
+                   ORDER BY review_timestamp DESC""",
+                (doc_hash,)
+            ).fetchall()
+        if not rows:
+            return JSONResponse({
+                "status": "NO_MATCH",
+                "message": "No verification receipt matches this hash.",
+            })
+        return JSONResponse({
+            "status": "MATCH_FOUND",
+            "matches": [
+                {"receipt_id": r[0], "tsa_status": r[1], "timestamp": r[2], "context": r[3]}
+                for r in rows
+            ],
+            "message": f"{len(rows)} receipt(s) found for this document hash.",
+        })
+
     @app.post("/api/feedback")
     async def submit_feedback(request: Request):
         body = await request.json()
