@@ -581,6 +581,10 @@ def create_app():
     async def documentation():
         return HTMLResponse(content=read_html("docs.html"))
 
+    @app.get("/cases", response_class=HTMLResponse)
+    async def cases():
+        return HTMLResponse(content=read_html("cases.html"))
+
     from fastapi.responses import FileResponse
 
     # ================================================================
