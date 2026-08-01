@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8,7 +7,7 @@
 <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png">
 <link rel="apple-touch-icon" sizes="192x192" href="/favicon-192.png">
 <title>ZTR — Zorthex Temporal Registry · The Professional Declaration Standard</title>
-<meta name="description" content="Before you file, you declare. ZTR makes it tamper-evident, dated, and provable. The professional verification standard for AI-assisted legal work.">
+<meta name="description" content="Before you file, you declare. ZTR makes it tamper-evident, dated, and provable. The professional verification standard for AI-assisted work.">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -19,8 +18,6 @@
 }
 body{background:var(--black);color:var(--white);font-family:'Inter',sans-serif;min-height:100vh;overflow-x:hidden}
 a{color:inherit;text-decoration:none}
-
-/* NAV */
 nav{display:flex;justify-content:space-between;align-items:center;padding:22px 60px;border-bottom:1px solid var(--border);position:sticky;top:0;background:rgba(10,10,10,0.97);backdrop-filter:blur(12px);z-index:100}
 .nav-logo{display:flex;align-items:center;gap:14px}
 .nav-mark{width:38px;height:38px;border:1.5px solid var(--gold);border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:12px;color:var(--gold);letter-spacing:1px}
@@ -30,17 +27,13 @@ nav{display:flex;justify-content:space-between;align-items:center;padding:22px 6
 .nav-links a{color:var(--grey);font-size:12px;letter-spacing:0.5px;transition:color 0.2s}
 .nav-links a:hover{color:var(--gold)}
 .nav-badge{font-size:10px;color:var(--gold);border:1px solid var(--gold-dim);padding:4px 12px;letter-spacing:1px}
-
-/* HERO */
-.hero{max-width:860px;margin:0 auto;padding:100px 60px 80px;text-align:center}
+.hero{max-width:860px;margin:0 auto;padding:80px 60px 60px;text-align:center}
 .hero-stamp{display:inline-block;border:1px solid var(--gold-dim);color:var(--gold);font-size:10px;letter-spacing:3px;text-transform:uppercase;padding:6px 20px;margin-bottom:44px}
 .hero h1{font-family:'Playfair Display',serif;font-size:48px;font-weight:700;color:var(--white);line-height:1.2;margin-bottom:20px}
 .hero h1 em{color:var(--gold);font-style:italic}
 .hero-divider{width:60px;height:1px;background:var(--gold-dim);margin:28px auto}
 .hero-sub{font-size:16px;color:var(--grey);line-height:1.85;max-width:620px;margin:0 auto 20px;font-weight:300}
-.hero-declaration{font-family:'Playfair Display',serif;font-size:20px;color:var(--gold);margin-top:32px;font-style:italic}
-
-/* FOUR PILLARS */
+.hero-declaration{font-family:'Playfair Display',serif;font-size:20px;color:var(--gold);margin-top:24px;font-style:italic}
 .pillars{background:var(--dark);border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:60px}
 .pillars-inner{max-width:860px;margin:0 auto}
 .section-label{font-size:10px;color:var(--gold);letter-spacing:3px;text-transform:uppercase;margin-bottom:32px}
@@ -50,22 +43,8 @@ nav{display:flex;justify-content:space-between;align-items:center;padding:22px 6
 .pillar-title{font-size:14px;color:var(--white);font-weight:600;margin-bottom:10px}
 .pillar-body{font-size:12px;color:var(--grey);line-height:1.75}
 .pillar-body em{color:var(--gold);font-style:normal;font-weight:500}
-
-/* PROBLEM */
-.problem{max-width:860px;margin:80px auto;padding:0 60px}
-.problem-rule{font-family:'Playfair Display',serif;font-size:24px;color:var(--white);line-height:1.5;margin-bottom:40px;padding-bottom:32px;border-bottom:1px solid var(--border)}
-.problem-rule em{color:var(--gold);font-style:italic}
-.cases{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-.case{background:var(--card);border:1px solid var(--border);border-left:3px solid var(--gold-dim);padding:24px}
-.case-id{font-size:10px;color:var(--gold-dim);letter-spacing:1.5px;margin-bottom:10px;font-family:monospace}
-.case-title{font-size:13px;color:var(--white);font-weight:600;margin-bottom:8px}
-.case-body{font-size:12px;color:var(--grey);line-height:1.7}
-.case-verdict{font-size:11px;color:var(--gold);margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
-
-/* TABLE COMPARISON */
 .comparison{background:var(--dark);border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:80px 60px}
 .comparison-inner{max-width:860px;margin:0 auto}
-.comparison h2{font-family:'Playfair Display',serif;font-size:28px;color:var(--white);margin-bottom:40px}
 table{width:100%;border-collapse:collapse}
 th{text-align:left;padding:12px 20px;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--dim);border-bottom:1px solid var(--border)}
 th.ztr-col{color:var(--gold)}
@@ -74,51 +53,27 @@ td.label{color:var(--white);font-weight:500}
 td.without{color:var(--dim)}
 td.with{color:var(--white)}
 tr:last-child td{border-bottom:none}
-
-/* HOW IT WORKS */
 .how{max-width:860px;margin:80px auto;padding:0 60px}
-.how h2{font-family:'Playfair Display',serif;font-size:28px;color:var(--white);margin-bottom:40px}
 .steps{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:48px}
 .step{background:var(--card);border:1px solid var(--border);padding:28px}
 .step-num{font-family:'Playfair Display',serif;font-size:40px;color:var(--gold-dim);line-height:1;margin-bottom:16px}
 .step-title{font-size:14px;color:var(--white);font-weight:600;margin-bottom:10px}
 .step-body{font-size:12.5px;color:var(--grey);line-height:1.75}
 .step-example{font-family:monospace;font-size:11px;color:var(--gold);background:var(--dark);padding:10px 14px;margin-top:12px;border-left:2px solid var(--gold-dim)}
-
-/* RECEIPT */
 .receipt{background:var(--dark);border:1px solid var(--gold-dim);padding:36px;margin-bottom:40px}
 .receipt-label{font-size:10px;color:var(--gold);letter-spacing:3px;text-transform:uppercase;margin-bottom:20px}
 .receipt-body{font-family:monospace;font-size:12.5px;line-height:2.2;color:var(--white)}
-.rf{color:var(--gold)}
-.rv{color:#a0c8a0}
-.rh{color:var(--dim)}
+.rf{color:var(--gold)}.rv{color:#a0c8a0}.rh{color:var(--dim)}
 .receipt-note{font-size:12px;color:var(--dim);margin-top:16px;font-style:italic}
-
-/* DECLARATION BOX */
 .declaration-box{background:var(--black);border:1px solid var(--border);border-left:3px solid var(--gold);padding:32px;margin-bottom:16px}
 .declaration-box h3{font-family:'Playfair Display',serif;font-size:18px;color:var(--white);margin-bottom:12px}
 .declaration-box p{font-size:13.5px;color:var(--grey);line-height:1.8}
-
-/* NOT */
 .not{background:var(--card);border:1px solid var(--border);padding:32px}
-.not h3{font-size:11px;color:var(--grey);letter-spacing:2px;text-transform:uppercase;margin-bottom:20px}
-.not-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.not-item{font-size:12px;color:var(--dim);padding-left:16px;position:relative;line-height:1.6}
-.not-item:before{content:"✗";position:absolute;left:0;color:var(--red);font-size:10px}
-
-/* NORMS */
-.norms-section{background:var(--dark);border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:80px 60px}
-.norms-inner{max-width:860px;margin:0 auto}
-.norms-inner h2{font-family:'Playfair Display',serif;font-size:28px;color:var(--white);margin-bottom:8px}
-.norms-lead{font-size:14px;color:var(--grey);margin-bottom:40px;line-height:1.7}
-.norms-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
-.norm{background:var(--card);border:1px solid var(--border);border-top:2px solid var(--gold-dim);padding:24px}
-.norm-juris{font-size:10px;color:var(--gold);letter-spacing:2px;margin-bottom:8px}
-.norm-title{font-size:13px;color:var(--white);font-weight:600;margin-bottom:8px}
-.norm-body{font-size:12px;color:var(--grey);line-height:1.65}
-.norm-ztr{font-size:11px;color:var(--gold-dim);margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
-
-/* CTA */
+.case{background:var(--card);border:1px solid var(--border);border-left:3px solid var(--gold-dim);padding:24px;max-width:860px;margin:0 auto}
+.case-id{font-size:10px;color:var(--gold-dim);letter-spacing:1.5px;margin-bottom:10px;font-family:monospace}
+.case-title{font-size:13px;color:var(--white);font-weight:600;margin-bottom:8px}
+.case-body{font-size:12px;color:var(--grey);line-height:1.7}
+.case-verdict{font-size:11px;color:var(--gold);margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
 .cta-section{max-width:860px;margin:80px auto;padding:0 60px;text-align:center}
 .cta-section h2{font-family:'Playfair Display',serif;font-size:32px;color:var(--white);margin-bottom:16px;line-height:1.3}
 .cta-section p{font-size:14px;color:var(--grey);margin-bottom:40px;line-height:1.8}
@@ -127,22 +82,17 @@ tr:last-child td{border-bottom:none}
 .cta-primary:hover{background:var(--gold-light)}
 .cta-secondary{border:1px solid var(--gold-dim);color:var(--gold);padding:14px 40px;font-size:12px;letter-spacing:1px;text-transform:uppercase}
 .powered{font-size:11px;color:var(--dim);margin-top:32px;letter-spacing:0.5px;line-height:2}
-
-/* FOOTER */
 footer{border-top:1px solid var(--border);padding:40px 60px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:20px}
 .footer-left{font-size:11px;color:var(--dim);line-height:2}
 .footer-right{display:flex;gap:24px}
 .footer-right a{font-size:11px;color:var(--dim);transition:color 0.2s}
 .footer-right a:hover{color:var(--gold)}
-
 @media(max-width:768px){
 nav{padding:16px 20px}.nav-links{gap:16px}
 .hero{padding:60px 20px 40px}.hero h1{font-size:30px}
 .pillars{padding:40px 20px}.pillars-grid{grid-template-columns:1fr 1fr}
-.problem{padding:0 20px}.cases{grid-template-columns:1fr}
 .comparison{padding:40px 20px}
 .how{padding:0 20px}.steps{grid-template-columns:1fr}
-.norms-section{padding:40px 20px}.norms-grid{grid-template-columns:1fr}
 .cta-section{padding:0 20px}
 footer{padding:32px 20px;flex-direction:column;align-items:flex-start}
 }
@@ -160,47 +110,38 @@ footer{padding:32px 20px;flex-direction:column;align-items:flex-start}
   </div>
   <div class="nav-links">
     <a href="/documentation">Documentation</a>
+    <a href="/cases">Cases</a>
     <a href="/privacy">Privacy</a>
     <a href="/terms">Terms</a>
     <span class="nav-badge">eIDAS-QUALIFIED TIMESTAMPS</span>
   </div>
 </nav>
 
-<!-- EARLY ACCESS BANNER -->
-<div style="background:#1a1a2e;text-align:center;padding:10px 16px;
-            border-bottom:1px solid #2a2a3e;">
-  <span style="font-size:11px;color:#d4aa4c;letter-spacing:2px;
-               text-transform:uppercase">
-    ✦ NOW IN THE CLAUDE DIRECTORY
-  </span>
-  <span style="font-size:11px;color:#999;margin-left:16px">
-    Available to all Claude users worldwide. 
-    Early Access — free with feedback.
-  </span>
+<!-- 1. EARLY ACCESS BANNER -->
+<div style="background:#1a1a2e;text-align:center;padding:10px 16px;border-bottom:1px solid #2a2a3e;">
+  <span style="font-size:11px;color:#d4aa4c;letter-spacing:2px;text-transform:uppercase">✦ NOW IN THE CLAUDE DIRECTORY</span>
+  <span style="font-size:11px;color:#999;margin-left:16px">Available to all Claude users worldwide. Early Access — free with feedback.</span>
 </div>
 
-<!-- ARUBA eIDAS BOX -->
-<div style="background:#0d0d1a;text-align:center;padding:14px 20px;
-            border-bottom:1px solid #1a1a2e;">
-  <span style="font-size:12px;color:#c8c8c8;letter-spacing:0.5px;">
-    eIDAS-qualified timestamps by 
-    <strong style="color:#d4aa4c;">Aruba PEC S.p.A.</strong>
-    — Qualified Trust Service Provider · Recognised in 
-    27 EU countries and the United Kingdom · 
-    30-year archival · RFC 3161
-  </span>
+<!-- 2. ARUBA eIDAS BOX -->
+<div style="background:#0d0d1a;text-align:center;padding:14px 20px;border-bottom:1px solid #1a1a2e;">
+  <span style="font-size:12px;color:#c8c8c8;letter-spacing:0.5px;">eIDAS-qualified timestamps by <strong style="color:#d4aa4c;">Aruba PEC S.p.A.</strong> — Qualified Trust Service Provider · Recognised in 27 EU countries and the United Kingdom · 30-year archival · RFC 3161</span>
 </div>
 
-<!-- HERO -->
+<!-- 3. HERO + TWO BUTTONS -->
 <div class="hero">
-  <div class="hero-stamp">Professional Verification Standard · Legal AI Compliance</div>
+  <div class="hero-stamp">Professional Verification Standard · AI Compliance</div>
   <h1>Before you file,<br>you declare.<br>ZTR makes it <em>provable</em>.</h1>
   <div class="hero-divider"></div>
   <p class="hero-sub">Every document you file contains an implicit statement: "I verified." ZTR makes it explicit, contemporaneous, and verifiable. In an era where artificial intelligence generates content indistinguishable from human work, the simple assertion "I verified" is no longer sufficient. The court cannot take your word for it. It must see the proof.</p>
   <p class="hero-declaration">"This is not a click. This is a declaration."</p>
+  <div style="text-align:center;margin-top:24px;">
+    <a href="https://claude.ai/directory/connectors/ztr-temporal-registry" style="display:inline-block;padding:12px 28px;background:#d4aa4c;color:#1a1a2e;text-decoration:none;font-weight:bold;font-size:0.95rem;border-radius:4px;margin-right:12px;">Install from Claude Directory</a>
+    <a href="#enterprise" style="display:inline-block;padding:12px 28px;background:transparent;color:#d4aa4c;text-decoration:none;font-weight:bold;font-size:0.95rem;border-radius:4px;border:1px solid #d4aa4c;">Enterprise &amp; Partnership</a>
+  </div>
 </div>
 
-<!-- FOUR PILLARS -->
+<!-- 4. FOUR PILLARS -->
 <div class="pillars">
   <div class="pillars-inner">
     <div class="section-label">What ZTR Records</div>
@@ -229,86 +170,7 @@ footer{padding:32px 20px;flex-direction:column;align-items:flex-start}
   </div>
 </div>
 
-<!-- PROBLEM -->
-<div class="problem">
-  <p class="problem-rule">The problem ZTR solves is not hallucination. It is the <em>absence of proof that verification ever occurred.</em> Courts across four jurisdictions have now established that this absence is treated as evidence of fault — independent of whether an error was made.</p>
-  <div class="cases">
-    <div class="case">
-      <div class="case-id">Miller v. Regions Bank · N.D. Alabama · 2026</div>
-      <div class="case-title">The Two-Track Doctrine</div>
-      <div class="case-body">AI hallucinations in a federal brief. The error received a public reprimand. The destruction of the ChatGPT account — eliminating all contemporaneous record — received adverse inference, contempt, and a six-month suspension.</div>
-      <div class="case-verdict">The sanction was for the missing record, not the error.</div>
-    </div>
-    <div class="case">
-      <div class="case-id">H.C. v. Contreras · California 5th DCA · F089316 · 2026</div>
-      <div class="case-title">Three Gates. Zero Records.</div>
-      <div class="case-body">A fabricated citation flagged by opposing counsel. The judge adopted it anyway, copying it verbatim into the ruling — identified on appeal through an identical typographical error. Three verification gates. No contemporaneous record of any review.</div>
-      <div class="case-verdict">Reversed. Reassigned to a new judge.</div>
-    </div>
-    <div class="case">
-      <div class="case-id">CPS / Tobosaru · EWHC 1720 (Admin) · UK · 2026</div>
-      <div class="case-title">The State as Actor.</div>
-      <div class="case-body">The Crown Prosecution Service submitted hallucinated citations to the High Court. Each reader assumed someone upstream had already verified. No one had. The material survived the permission stage unchallenged.</div>
-      <div class="case-verdict">CPS admitted: "human error in failure to verify."</div>
-    </div>
-    <div class="case">
-      <div class="case-id">Law Society of Ontario · Mary Hyun-Sook Lee · Canada · 2026</div>
-      <div class="case-title">First Canadian Suspension.</div>
-      <div class="case-body">ChatGPT-fabricated citations in an estate matter. The lawyer denied using AI. The Tribunal was explicit: the dishonesty — the absence of any truthful contemporaneous account — drove the severity of the sanction.</div>
-      <div class="case-verdict">6-month suspension · $10,000 · Criminal contempt referral.</div>
-    </div>
-  </div>
-</div>
-
-<!-- COMPARISON TABLE -->
-<div class="comparison">
-  <div class="comparison-inner">
-    <h2 style="font-family:'Playfair Display',serif;color:var(--white);margin-bottom:40px">Without ZTR and with ZTR.</h2>
-    <table>
-      <thead>
-        <tr>
-          <th style="width:30%">Situation</th>
-          <th class="without-col" style="width:35%">Without ZTR</th>
-          <th class="ztr-col" style="width:35%">With ZTR</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td class="label">When challenged in court</td>
-          <td class="without">"I verified" — your word against the record</td>
-          <td class="with">A timestamped, tamper-evident, verifiable declaration</td>
-        </tr>
-        <tr>
-          <td class="label">Proof of timing</td>
-          <td class="without">No trace of when verification occurred</td>
-          <td class="with">Certain proof of the exact moment — eIDAS qualified</td>
-        </tr>
-        <tr>
-          <td class="label">Document integrity</td>
-          <td class="without">The document may have been modified after review</td>
-          <td class="with">SHA-256 hash links declaration to the specific document</td>
-        </tr>
-        <tr>
-          <td class="label">Under disciplinary review</td>
-          <td class="without">Only memories and retrospective notes</td>
-          <td class="with">Receipt ID enabling immediate retrieval of the contemporaneous record</td>
-        </tr>
-        <tr>
-          <td class="label">Firm AI policy compliance</td>
-          <td class="without">Policy exists on paper — no proof it was followed</td>
-          <td class="with">Per-document proof that the policy was applied</td>
-        </tr>
-        <tr>
-          <td class="label">Sanctions exposure</td>
-          <td class="without">The court converts absence into evidence of fault</td>
-          <td class="with">The record exists before it is ever needed</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-</div>
-
-<!-- HOW IT WORKS -->
+<!-- 5. HOW IT WORKS -->
 <div class="how" style="margin-top:80px">
   <div class="section-label">How ZTR Works</div>
   <h2 style="font-family:'Playfair Display',serif;font-size:28px;color:var(--white);margin-bottom:40px">Four steps. One verifiable record.</h2>
@@ -356,7 +218,7 @@ footer{padding:32px 20px;flex-direction:column;align-items:flex-start}
   </div>
 
   <div class="not">
-    <h3>What ZTR Does Not Do</h3>
+    <h3 style="font-size:11px;color:var(--grey);letter-spacing:2px;text-transform:uppercase;margin-bottom:20px">What ZTR Does Not Do</h3>
     <p style="font-size:13px;color:var(--dim);font-style:italic;margin-bottom:16px">Before we tell you what ZTR is, let us be clear about what it is not.</p>
     <p style="font-size:13.5px;color:var(--grey);line-height:1.8;margin-bottom:20px">ZTR does not review your work. It does not check citations. It does not evaluate whether your verification was sufficient.</p>
     <p style="font-size:14px;color:var(--white);font-weight:500;margin-bottom:12px">That is not a limitation. That is a feature.</p>
@@ -366,60 +228,57 @@ footer{padding:32px 20px;flex-direction:column;align-items:flex-start}
   </div>
 </div>
 
-<!-- NORMS -->
-<div class="norms-section" style="margin-top:80px">
-  <div class="norms-inner">
-    <div class="section-label">The Regulatory Context</div>
-    <h2 style="font-family:'Playfair Display',serif;font-size:28px;color:var(--white);margin-bottom:8px">Every major AI governance framework now requires demonstrable human oversight.</h2>
-    <p class="norms-lead">The question is no longer whether oversight is required. It is whether you can prove it happened.</p>
-    <div class="norms-grid">
-      <div class="norm">
-        <div class="norm-juris">USA · 2024</div>
-        <div class="norm-title">ABA Formal Opinion 512</div>
-        <div class="norm-body">Lawyers using AI must apply competence and supervision standards. Every AI-assisted filing must be independently verified before submission.</div>
-        <div class="norm-ztr">ZTR creates the contemporaneous record of that verification.</div>
-      </div>
-      <div class="norm">
-        <div class="norm-juris">USA · 2026</div>
-        <div class="norm-title">Rhode Island Rule 1.1</div>
-        <div class="norm-body">The Supreme Court amended the competence rule to explicitly include understanding AI capabilities and limitations. Independent verification before filing is now a stated requirement.</div>
-        <div class="norm-ztr">ZTR documents compliance with the verification requirement.</div>
-      </div>
-      <div class="norm">
-        <div class="norm-juris">EU · 2026</div>
-        <div class="norm-title">EU AI Act · Article 17</div>
-        <div class="norm-body">High-risk AI systems require documented quality management systems. Human oversight must be built into workflows — and demonstrable. The EN 18286 harmonised standard is imminent.</div>
-        <div class="norm-ztr">ZTR provides the contemporaneous record that oversight was exercised.</div>
-      </div>
-      <div class="norm">
-        <div class="norm-juris">UK · 2026</div>
-        <div class="norm-title">UKJT Legal Statement on AI</div>
-        <div class="norm-body">Professionals may be negligent for failing to use AI where a competent colleague would — and for using it without adequate verification. The standard is moving, and it moves with adoption.</div>
-        <div class="norm-ztr">ZTR documents that the verification standard was met, case by case.</div>
-      </div>
-      <div class="norm">
-        <div class="norm-juris">UK · 2026</div>
-        <div class="norm-title">Nuffield Foundation · Sargeant</div>
-        <div class="norm-body">Of 45 AI tools in the England and Wales justice system, only 7 have independent evaluation. Human oversight is treated as the principal safeguard — yet no deployment evaluation examines whether it works in practice.</div>
-        <div class="norm-ztr">ZTR is the first instrument that makes human oversight demonstrable at the document level.</div>
-      </div>
-      <div class="norm">
-        <div class="norm-juris">MULTIPLE · 2026</div>
-        <div class="norm-title">The Sanctions Doctrine</div>
-        <div class="norm-body">Courts across four jurisdictions have established that the absence of a contemporaneous verification record is treated as evidence of fault — independent of whether an error was made. The missing record is the sanctionable fact.</div>
-        <div class="norm-ztr">ZTR ensures a contemporaneous record always exists, before it is ever needed.</div>
-      </div>
-    </div>
+<!-- 6. COMPARISON TABLE -->
+<div class="comparison" style="margin-top:80px">
+  <div class="comparison-inner">
+    <h2 style="font-family:'Playfair Display',serif;color:var(--white);margin-bottom:40px">Without ZTR and with ZTR.</h2>
+    <table>
+      <thead><tr>
+        <th style="width:30%">Situation</th>
+        <th style="width:35%">Without ZTR</th>
+        <th class="ztr-col" style="width:35%">With ZTR</th>
+      </tr></thead>
+      <tbody>
+        <tr><td class="label">When challenged in court</td><td class="without">"I verified" — your word against the record</td><td class="with">A timestamped, tamper-evident, verifiable declaration</td></tr>
+        <tr><td class="label">Proof of timing</td><td class="without">No trace of when verification occurred</td><td class="with">Certain proof of the exact moment — eIDAS qualified</td></tr>
+        <tr><td class="label">Document integrity</td><td class="without">The document may have been modified after review</td><td class="with">SHA-256 hash links declaration to the specific document</td></tr>
+        <tr><td class="label">Under disciplinary review</td><td class="without">Only memories and retrospective notes</td><td class="with">Receipt ID enabling immediate retrieval of the contemporaneous record</td></tr>
+        <tr><td class="label">Firm AI policy compliance</td><td class="without">Policy exists on paper — no proof it was followed</td><td class="with">Per-document proof that the policy was applied</td></tr>
+        <tr><td class="label">Sanctions exposure</td><td class="without">The court converts absence into evidence of fault</td><td class="with">The record exists before it is ever needed</td></tr>
+      </tbody>
+    </table>
   </div>
 </div>
 
-<!-- CTA -->
+<!-- 7. ENTERPRISE & PARTNERSHIP -->
+<section id="enterprise" style="padding:60px 20px;max-width:900px;margin:0 auto;text-align:center;">
+  <h2 style="color:#d4aa4c;font-size:1.6rem;margin-bottom:12px;">Enterprise &amp; Partnership</h2>
+  <p style="color:#c8c8c8;font-size:1rem;line-height:1.7;max-width:700px;margin:0 auto 24px;">ZTR is available for enterprise integration, volume licensing, and strategic partnerships. If you represent a law firm, a Qualified Trust Service Provider, a compliance platform, or an organisation seeking AI governance solutions — we'd like to hear from you.</p>
+  <a href="mailto:admin@temporalregistry.com?subject=Enterprise%20Inquiry%20—%20ZTR" style="display:inline-block;padding:12px 32px;background:#d4aa4c;color:#1a1a2e;text-decoration:none;font-weight:bold;font-size:0.95rem;border-radius:4px;">Contact for Enterprise &amp; Partnership</a>
+</section>
+
+<!-- 8. ONE CASE EXAMPLE + LINK -->
+<div style="max-width:860px;margin:40px auto 0;padding:0 60px">
+  <div class="section-label">The Evidentiary Standard Has Changed</div>
+  <p style="font-family:'Playfair Display',serif;font-size:20px;color:var(--white);line-height:1.5;margin-bottom:32px">Courts across four jurisdictions have established that the absence of a contemporaneous verification record is treated as evidence of fault — independent of whether an error was made.</p>
+  <div class="case">
+    <div class="case-id">Miller v. Regions Bank · N.D. Alabama · 2026</div>
+    <div class="case-title">The Two-Track Doctrine</div>
+    <div class="case-body">AI hallucinations in a federal brief. The error received a public reprimand. The destruction of the ChatGPT account — eliminating all contemporaneous record — received adverse inference, contempt, and a six-month suspension.</div>
+    <div class="case-verdict">The sanction was for the missing record, not the error.</div>
+  </div>
+  <p style="text-align:center;margin-top:20px;">
+    <a href="/cases" style="color:#d4aa4c;text-decoration:none;font-size:0.95rem;">See all four cases across US, UK, and Canada that established the precedent →</a>
+  </p>
+</div>
+
+<!-- 9. CTA EARLY ACCESS -->
 <div class="cta-section" style="margin-top:80px;margin-bottom:80px">
   <div class="section-label">The Professional Standard</div>
   <h2 style="font-family:'Playfair Display',serif;font-size:32px;color:var(--white);margin-bottom:16px;line-height:1.3">The question is no longer whether to verify.<br>It is whether you can prove you did.</h2>
-  <p>ZTR is now listed in the official Claude Connectors Directory. Install it from the Directory, verify your first document, and help shape the product with your feedback. Early Access is free — all we ask is that you tell us what works and what doesn't. The contemporaneous record is created at the moment of review — before it is ever needed, before the question is ever asked.</p>
+  <p>ZTR is now listed in the official Claude Connectors Directory. Install it from the Directory, verify your first document, and help shape the product with your feedback. Early Access is free — all we ask is that you tell us what works and what doesn't.</p>
   <div class="cta-group">
-    <a href="/documentation" class="cta-primary">Install on Claude →</a>
+    <a href="https://claude.ai/directory/connectors/ztr-temporal-registry" class="cta-primary">Install from Claude Directory →</a>
     <a href="/documentation" class="cta-secondary">Read Documentation</a>
   </div>
   <div class="powered">
@@ -429,28 +288,7 @@ footer{padding:32px 20px;flex-direction:column;align-items:flex-start}
   </div>
 </div>
 
-<!-- ENTERPRISE & PARTNERSHIP -->
-<section style="padding:60px 20px;max-width:900px;margin:0 auto;
-                text-align:center;">
-  <h2 style="color:#d4aa4c;font-size:1.6rem;margin-bottom:12px;">
-    Enterprise &amp; Partnership
-  </h2>
-  <p style="color:#c8c8c8;font-size:1rem;line-height:1.7;
-            max-width:700px;margin:0 auto 24px;">
-    ZTR is available for enterprise integration, volume licensing, 
-    and strategic partnerships. If you represent a law firm, 
-    a Qualified Trust Service Provider, a compliance platform, 
-    or an organisation seeking AI governance solutions — 
-    we'd like to hear from you.
-  </p>
-  <a href="mailto:admin@temporalregistry.com?subject=Enterprise%20Inquiry%20—%20ZTR"
-     style="display:inline-block;padding:12px 32px;
-            background:#d4aa4c;color:#1a1a2e;text-decoration:none;
-            font-weight:bold;font-size:0.95rem;border-radius:4px;">
-    Contact for Enterprise &amp; Partnership
-  </a>
-</section>
-
+<!-- 10. FOOTER -->
 <footer>
   <div class="footer-left">
     © 2026 Renato Santi — ZORTHEX™ (Trademark UIBM N.302026000090628)<br>
@@ -458,6 +296,7 @@ footer{padding:32px 20px;flex-direction:column;align-items:flex-start}
   </div>
   <div class="footer-right">
     <a href="/documentation">Documentation</a>
+    <a href="/cases">Cases</a>
     <a href="/privacy">Privacy Policy</a>
     <a href="/terms">Terms of Service</a>
   </div>
