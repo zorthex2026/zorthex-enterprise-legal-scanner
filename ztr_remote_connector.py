@@ -1167,9 +1167,10 @@ MCP_TOOL_DEFINITIONS = [
             "hashed (SHA-256), the professional's declaration is timestamped via an "
             "eIDAS-qualified TSA (Aruba PEC S.p.A.), and a retrievable receipt with HMAC "
             "integrity seal is returned. The document is immediately discarded — never "
-            "stored or transmitted beyond the hash. Use this before filing, submitting, "
-            "or approving any AI-assisted document — legal, medical, financial, "
-            "technical, or regulatory."
+            "stored or transmitted beyond the hash. When the user uploads a file, pass "
+            "the file content as base64 via file_content_base64 — do NOT extract text. "
+            "Use this before filing, submitting, or approving any AI-assisted document — "
+            "legal, medical, financial, technical, or regulatory."
         ),
         "inputSchema": {
             "type": "object",
@@ -1177,17 +1178,18 @@ MCP_TOOL_DEFINITIONS = [
                 "document_text": {
                     "type": "string",
                     "description": (
-                        "The document text to verify. Hashed and immediately discarded. "
-                        "Never stored. Use this for text documents or when pasting content directly."
+                        "Plain text content to verify. Use this ONLY for text pasted "
+                        "directly by the user. Do NOT use this for uploaded files."
                     ),
                 },
                 "file_content_base64": {
                     "type": "string",
                     "description": (
-                        "Base64-encoded binary content of the original file (PDF, DOCX, etc.). "
-                        "When provided, the SHA-256 hash is computed on the original binary file, "
-                        "not on extracted text. This ensures the hash matches the actual file. "
-                        "Use this when the user uploads a file for verification."
+                        "Base64-encoded binary content of the original file (PDF, DOCX, etc). "
+                        "When a user uploads a file, ALWAYS use this parameter instead of "
+                        "extracting text. The hash will be computed on the original binary "
+                        "file, ensuring integrity. Do NOT extract text from the file — the "
+                        "hash must be computed on the original binary to ensure verifiability."
                     ),
                 },
                 "review_note": {
