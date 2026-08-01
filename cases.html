@@ -1,1284 +1,338 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-ZORTHEX™ TEMPORAL REGISTRY — REMOTE MCP CONNECTOR
-====================================================
-File: ztr_remote_connector.py
-Add to: github.com/zorthex2026/zorthex-enterprise-legal-scanner
-
-PURPOSE:
-  Extends the existing on-premise MCP server with a REMOTE mode
-  for the Anthropic Connectors Directory (Claude Cowork / Web).
-
-  On-premise mode (existing):
-    Claude Desktop → local MCP → scanner + registry on client machine
-
-  Remote mode (new):
-    Claude Cowork → HTTPS → temporalregistry.com → registry only
-    Scanner stays on-premise. Only the Temporal Registry is exposed remotely.
-    Document text is hashed server-side and immediately discarded.
-
-RELATIONSHIP TO EXISTING CODE:
-  - Uses the same capsule logic from zorthex_temporal_registry.py
-  - Uses the same SHA-256 hashing
-  - Uses the same Aruba PEC TSA (eIDAS qualified, RFC 3161)
-  - Does NOT expose the scanner remotely (scanner is local-only)
-  - Adds: HTTP server, OAuth, receipt storage, Anthropic directory compliance
-
-DEPLOYMENT:
-  Host: temporalregistry.com
-  Stack: FastAPI + uvicorn
-  Storage: SQLite (receipts)
-  TSA: Aruba PEC qualified TSA (eIDAS, servizi.arubapec.it)
-
-© 2026 Renato Santi — ZORTHEX™ (Trademark UIBM N.302026000090628)
-Proprietary — All rights reserved.
-"""
-
-import hashlib
-import json
-import sqlite3
-import os
-import base64
-import uuid
-import requests
-from datetime import datetime, timezone
-from dataclasses import dataclass, asdict
-from typing import Optional, List
-
-
-# ============================================================================
-# CORE: Verification Receipt
-# Derived from existing capsule v1.2 logic — same hash, same TSA, simpler
-# output for the remote use case (no scanner, no verdict, no policy context)
-# ============================================================================
-
-@dataclass
-class VerificationReceipt:
-    """
-    A contemporaneous record that a human verification step occurred.
-    
-    This is the remote equivalent of the on-premise capsule.
-    Key differences from capsule v1.2:
-      - No scanner verdict (scanner is local-only)
-      - No policy context (that's the scanner's job)
-      - No verification manifest (simplified for remote)
-      - Adds: user identity, review note, context type
-    
-    Same as capsule v1.2:
-      - SHA-256 document hash (document never stored)
-      - eIDAS-qualified timestamp (Aruba PEC TSA)
-      - HMAC integrity seal
-      - Honest state: declares UNVERIFIED if no TSA available
-    """
-    receipt_id: str
-    document_sha256: str
-    review_timestamp: str           # ISO 8601 UTC
-    review_note: str                # reviewer's note (optional)
-    context: str                    # review type
-    user_id: str                    # authenticated user
-    org_id: str                     # organization (optional)
-    tsa_status: str                 # VERIFIED (eIDAS) | UNVERIFIED | TSA_ERROR
-    tsa_token: Optional[str]        # RFC 3161 timestamp token (base64)
-    integrity_hmac: Optional[str]   # HMAC-SHA256 seal
-    server_version: str = "0.1"
-    capsule_lineage: str = "v1.2"   # traces origin to capsule v1.2
-
-    def to_dict(self) -> dict:
-        return asdict(self)
-
-    def to_json(self) -> str:
-        return json.dumps(self.to_dict(), indent=2)
-
-
-# ============================================================================
-# HASHING — same as capsule v1.2
-# ============================================================================
-
-def compute_sha256(text: str) -> str:
-    """
-    SHA-256 hash of document text.
-    After this call, the text MUST be discarded.
-    Only the 64-character hash is retained.
-    """
-    return hashlib.sha256(text.encode('utf-8')).hexdigest()
-
-
-def compute_hmac(receipt_data: str, key: str = None) -> str:
-    """HMAC-SHA256 integrity seal — same approach as capsule v1.2."""
-    import hmac
-    if key is None:
-        key = os.environ.get("ZTR_HMAC_KEY", "ztr-default-key-change-in-production")
-    return hmac.new(
-        key.encode('utf-8'),
-        receipt_data.encode('utf-8'),
-        hashlib.sha256
-    ).hexdigest()
-
-
-# ============================================================================
-# RECEIPT ID GENERATION
-# ============================================================================
-
-def generate_receipt_id() -> str:
-    """ZTR-{YYYYMMDDHHMMSS}-{8 random hex chars}"""
-    ts = datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')
-    rand = hashlib.sha256(os.urandom(16)).hexdigest()[:8]
-    return f"ZTR-{ts}-{rand}"
-
-
-# ============================================================================
-# ARUBA PEC TSA — eIDAS qualified timestamp (RFC 3161)
-# Same TSA used for capsule v1.2 — first admissible capsule 5 July 2026
-# ============================================================================
-
-def aruba_tsa_timestamp(doc_hash: str) -> dict:
-    """
-    Request RFC 3161 timestamp from Aruba PEC QUALIFIED TSA (eIDAS).
-    Endpoint: https://servizi.arubapec.it/tsa/ngrequest.php
-    Algorithm: SHA-256
-    Auth: HTTP Basic (credentials from environment variables)
-    Fallback: FreeTSA.org (non-qualified, free)
-    Version: 2026-07-23-v4-qualified
-    """
-    import requests as http_requests
-    from requests.auth import HTTPBasicAuth
-    from pyasn1.type import univ, namedtype
-    from pyasn1.codec.der import encoder
-    from pyasn1_modules import rfc2459
-
-    hash_bytes = bytes.fromhex(doc_hash)
-
-    # --- Build RFC 3161 TimeStampReq with SHA-256 ---
-    sha256_oid = univ.ObjectIdentifier((2, 16, 840, 1, 101, 3, 4, 2, 1))
-
-    class MessageImprint(univ.Sequence):
-        componentType = namedtype.NamedTypes(
-            namedtype.NamedType('hashAlgorithm', rfc2459.AlgorithmIdentifier()),
-            namedtype.NamedType('hashedMessage', univ.OctetString())
-        )
-
-    class TimeStampReq(univ.Sequence):
-        componentType = namedtype.NamedTypes(
-            namedtype.NamedType('version', univ.Integer()),
-            namedtype.NamedType('messageImprint', MessageImprint()),
-            namedtype.OptionalNamedType('reqPolicy', univ.ObjectIdentifier()),
-            namedtype.OptionalNamedType('nonce', univ.Integer()),
-            namedtype.DefaultedNamedType('certReq', univ.Boolean(False))
-        )
-
-    algo = rfc2459.AlgorithmIdentifier()
-    algo['algorithm'] = sha256_oid
-
-    mi = MessageImprint()
-    mi['hashAlgorithm'] = algo
-    mi['hashedMessage'] = univ.OctetString(hash_bytes)
-
-    req = TimeStampReq()
-    req['version'] = univ.Integer(1)
-    req['messageImprint'] = mi
-    req['certReq'] = univ.Boolean(True)
-
-    tsr_bytes = encoder.encode(req)
-
-    # --- Try Aruba QUALIFIED first, then FreeTSA fallback ---
-    aruba_user = os.environ.get("ARUBA_TSA_USERNAME", "")
-    aruba_pass = os.environ.get("ARUBA_TSA_PASSWORD", "")
-
-    endpoints = []
-    if aruba_user and aruba_pass:
-        endpoints.append({
-            "url": "https://servizi.arubapec.it/tsa/ngrequest.php",
-            "auth": HTTPBasicAuth(aruba_user, aruba_pass),
-            "qualified": True,
-        })
-    endpoints.append({
-        "url": "https://freetsa.org/tsr",
-        "auth": None,
-        "qualified": False,
-    })
-
-    last_error = None
-    for ep in endpoints:
-        try:
-            resp = http_requests.post(
-                ep["url"],
-                data=tsr_bytes,
-                headers={'Content-Type': 'application/timestamp-query'},
-                auth=ep.get("auth"),
-                timeout=15,
-            )
-            if resp.status_code == 200:
-                token_b64 = base64.b64encode(resp.content).decode('ascii')
-                return {
-                    "token": token_b64,
-                    "status": "granted",
-                    "endpoint": ep["url"],
-                    "qualified": ep["qualified"],
-                }
-        except Exception as e:
-            last_error = e
-            continue
-
-    raise Exception(f"All TSA endpoints failed. Last: {last_error}")
-
-
-# ============================================================================
-# RECEIPT CREATION
-# ============================================================================
-
-def create_receipt(
-    document_text: str,
-    user_id: str,
-    org_id: str = "",
-    review_note: str = "",
-    context: str = "legal_filing",
-    use_tsa: bool = True,
-) -> VerificationReceipt:
-    """
-    Core receipt creation — the remote equivalent of capsule generation.
-
-    1. Hash the document (SHA-256)
-    2. Discard the document text (NEVER stored)
-    3. Record timestamp
-    4. Call Aruba TSA if enabled (eIDAS qualified)
-    5. Seal with HMAC
-    6. Return receipt
-    """
-    # Step 1: Hash
-    doc_hash = compute_sha256(document_text)
-
-    # Step 2: Document text is now dead to us
-    # (Python GC will handle it; we never assign it to any persistent store)
-
-    # Step 3: Timestamp
-    now = datetime.now(timezone.utc).isoformat()
-    receipt_id = generate_receipt_id()
-
-    # Step 4: TSA
-    tsa_status = "UNVERIFIED"
-    tsa_token = None
-    if use_tsa:
-        try:
-            tsa_result = aruba_tsa_timestamp(doc_hash)
-            tsa_status = "VERIFIED"
-            tsa_token = tsa_result.get("token")
-        except Exception as e:
-            tsa_status = f"TSA_ERROR:{str(e)[:100]}"
-
-    # Step 5: HMAC seal
-    seal_data = f"{receipt_id}:{doc_hash}:{now}:{tsa_status}"
-    integrity_hmac = compute_hmac(seal_data)
-
-    return VerificationReceipt(
-        receipt_id=receipt_id,
-        document_sha256=doc_hash,
-        review_timestamp=now,
-        review_note=review_note,
-        context=context,
-        user_id=user_id,
-        org_id=org_id,
-        tsa_status=tsa_status,
-        tsa_token=tsa_token,
-        integrity_hmac=integrity_hmac,
-    )
-
-
-# ============================================================================
-# STORAGE: SQLite receipt database
-# ============================================================================
-
-class ReceiptStore:
-    """Persistent storage for verification receipts."""
-
-    def __init__(self, db_path: str = None):
-        if db_path is None:
-            db_path = os.environ.get("ZTR_DB_PATH", "ztr_receipts.db")
-        self.db_path = db_path
-        self._init_db()
-
-    def _init_db(self):
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS receipts (
-                    receipt_id TEXT PRIMARY KEY,
-                    document_sha256 TEXT NOT NULL,
-                    review_timestamp TEXT NOT NULL,
-                    review_note TEXT DEFAULT '',
-                    context TEXT DEFAULT 'general',
-                    user_id TEXT NOT NULL,
-                    org_id TEXT DEFAULT '',
-                    tsa_status TEXT NOT NULL,
-                    tsa_token TEXT,
-                    integrity_hmac TEXT,
-                    server_version TEXT DEFAULT '0.1',
-                    capsule_lineage TEXT DEFAULT 'v1.2',
-                    created_at TEXT DEFAULT (datetime('now'))
-                )
-            """)
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_user ON receipts(user_id)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_hash ON receipts(document_sha256)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_time ON receipts(review_timestamp)")
-
-    def store(self, receipt: VerificationReceipt):
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute("""
-                INSERT INTO receipts
-                (receipt_id, document_sha256, review_timestamp, review_note,
-                 context, user_id, org_id, tsa_status, tsa_token,
-                 integrity_hmac, server_version, capsule_lineage)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                receipt.receipt_id, receipt.document_sha256,
-                receipt.review_timestamp, receipt.review_note,
-                receipt.context, receipt.user_id, receipt.org_id,
-                receipt.tsa_status, receipt.tsa_token,
-                receipt.integrity_hmac, receipt.server_version,
-                receipt.capsule_lineage,
-            ))
-
-    def get(self, receipt_id: str) -> Optional[dict]:
-        with sqlite3.connect(self.db_path) as conn:
-            conn.row_factory = sqlite3.Row
-            row = conn.execute(
-                "SELECT * FROM receipts WHERE receipt_id = ?", (receipt_id,)
-            ).fetchone()
-            return dict(row) if row else None
-
-    def list_by_user(self, user_id: str, date_from: str = None,
-                     date_to: str = None, context: str = None,
-                     limit: int = 50) -> List[dict]:
-        query = "SELECT * FROM receipts WHERE user_id = ?"
-        params = [user_id]
-        if date_from:
-            query += " AND review_timestamp >= ?"
-            params.append(date_from)
-        if date_to:
-            query += " AND review_timestamp <= ?"
-            params.append(date_to)
-        if context:
-            query += " AND context = ?"
-            params.append(context)
-        query += " ORDER BY review_timestamp DESC LIMIT ?"
-        params.append(limit)
-        with sqlite3.connect(self.db_path) as conn:
-            conn.row_factory = sqlite3.Row
-            return [dict(r) for r in conn.execute(query, params).fetchall()]
-
-    def find_by_hash(self, document_sha256: str) -> List[dict]:
-        with sqlite3.connect(self.db_path) as conn:
-            conn.row_factory = sqlite3.Row
-            return [dict(r) for r in conn.execute(
-                "SELECT * FROM receipts WHERE document_sha256 = ? ORDER BY review_timestamp DESC",
-                (document_sha256,)
-            ).fetchall()]
-
-    def count_by_user(self, user_id: str) -> int:
-        with sqlite3.connect(self.db_path) as conn:
-            row = conn.execute(
-                "SELECT COUNT(*) FROM receipts WHERE user_id = ?", (user_id,)
-            ).fetchone()
-            return row[0] if row else 0
-
-
-# ============================================================================
-# FASTAPI APPLICATION — HTTP server for Anthropic Connectors Directory
-# ============================================================================
-
-def create_app():
-    """
-    FastAPI application serving ZTR as a remote MCP connector.
-
-    Endpoints:
-      POST /mcp/tools/verify_document  — Create verification receipt
-      POST /mcp/tools/check_receipt    — Retrieve a receipt
-      POST /mcp/tools/list_receipts    — List user's receipts
-      GET  /mcp/tools                  — List available tools
-      GET  /health                     — Health check
-      GET  /.well-known/anthropic-connector-challenge — Domain verification
-    """
-    from fastapi import FastAPI, Request, HTTPException
-    from fastapi.responses import JSONResponse
-    from fastapi.middleware.cors import CORSMiddleware
-
-    app = FastAPI(
-        title="ZTR — Temporal Registry",
-        description=(
-            "Verification timestamping for AI-assisted legal work. "
-            "Creates contemporaneous records proving that human review occurred. "
-            "Documents are hashed and immediately discarded — never stored. "
-            "Timestamps are eIDAS-qualified via Aruba PEC TSA."
-        ),
-        version="0.1",
-        docs_url="/docs",
-    )
-
-    # CORS for Claude origins
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=[
-            "https://claude.ai",
-            "https://www.anthropic.com",
-        ],
-        allow_methods=["GET", "POST"],
-        allow_headers=["*"],
-    )
-
-    store = ReceiptStore()
-
-    # --- Health ---
-    @app.get("/health")
-    async def health():
-        return {
-            "status": "ok",
-            "service": "ztr-mcp-remote",
-            "version": "0.1",
-            "capsule_lineage": "v1.2",
-            "tsa": "Aruba PEC (eIDAS qualified)",
-        }
-
-    # --- Tool: verify_document ---
-    @app.post("/mcp/tools/verify_document")
-    async def verify_document(request: Request):
-        body = await request.json()
-        user_id = request.headers.get("X-User-ID", "anonymous")
-        org_id = request.headers.get("X-Org-ID", "")
-
-        document_text = body.get("document_text")
-        if not document_text:
-            raise HTTPException(400, "document_text is required")
-        if len(document_text) > 5_000_000:  # 5MB limit
-            raise HTTPException(413, "Document too large (max 5MB)")
-
-        # --- Daily quota check (BEFORE TSA call to protect marche) ---
-        DAILY_QUOTA = 10
-        today_start = datetime.now(timezone.utc).strftime('%Y-%m-%dT00:00:00')
-        today_receipts = store.list_by_user(user_id, date_from=today_start)
-        if len(today_receipts) >= DAILY_QUOTA:
-            return JSONResponse(
-                status_code=429,
-                content={
-                    "status": "QUOTA_EXCEEDED",
-                    "message": (
-                        f"Technical preview fair-use quota reached "
-                        f"({DAILY_QUOTA} receipts/day). Quota resets at 00:00 UTC."
-                    ),
-                },
-            )
-
-        # --- Global TSA budget check (protects personal wallet) ---
-        DAILY_TSA_BUDGET = 5  # max qualified timestamps per day, all users combined
-        use_tsa = True
-        with sqlite3.connect(store.db_path) as conn:
-            row = conn.execute(
-                """SELECT COUNT(*) FROM receipts
-                   WHERE tsa_status = 'VERIFIED'
-                   AND review_timestamp >= ?""",
-                (today_start,),
-            ).fetchone()
-            if row[0] >= DAILY_TSA_BUDGET:
-                use_tsa = False
-
-        receipt = create_receipt(
-            document_text=document_text,
-            user_id=user_id,
-            org_id=org_id,
-            review_note=body.get("review_note", ""),
-            context=body.get("context", "legal_filing"),
-            use_tsa=use_tsa,
-        )
-        store.store(receipt)
-
-        # Document text is gone. Only the hash lives on.
-        return JSONResponse({
-            "receipt_id": receipt.receipt_id,
-            "document_sha256": receipt.document_sha256,
-            "review_timestamp": receipt.review_timestamp,
-            "tsa_status": receipt.tsa_status,
-            "integrity_hmac": receipt.integrity_hmac[:16] + "...",
-            "context": receipt.context,
-            "message": (
-                f"Verification recorded. Receipt: {receipt.receipt_id}. "
-                f"Hash: {receipt.document_sha256[:16]}... "
-                f"Time: {receipt.review_timestamp}. "
-                f"TSA: {receipt.tsa_status}. "
-                f"Document was not stored."
-            ),
-        })
-
-    # --- Tool: check_receipt ---
-    @app.post("/mcp/tools/check_receipt")
-    async def check_receipt(request: Request):
-        body = await request.json()
-        receipt_id = body.get("receipt_id")
-        if not receipt_id:
-            raise HTTPException(400, "receipt_id is required")
-
-        receipt = store.get(receipt_id)
-        if not receipt:
-            raise HTTPException(404, f"Receipt {receipt_id} not found")
-
-        # Don't expose TSA token in lookup (it's large)
-        result = dict(receipt)
-        if result.get("tsa_token"):
-            result["tsa_token"] = result["tsa_token"][:32] + "...(truncated)"
-        return JSONResponse(result)
-
-    # --- Tool: list_receipts ---
-    @app.post("/mcp/tools/list_receipts")
-    async def list_receipts(request: Request):
-        body = await request.json()
-        user_id = request.headers.get("X-User-ID", "anonymous")
-
-        receipts = store.list_by_user(
-            user_id=user_id,
-            date_from=body.get("date_from"),
-            date_to=body.get("date_to"),
-            context=body.get("context"),
-        )
-        # Strip TSA tokens from list view
-        for r in receipts:
-            if r.get("tsa_token"):
-                r["tsa_token"] = "(stored)"
-        return JSONResponse({"count": len(receipts), "receipts": receipts})
-
-    # --- Tool listing ---
-    @app.get("/mcp/tools")
-    async def list_tools():
-        return JSONResponse({"tools": MCP_TOOL_DEFINITIONS})
-
-    # --- Anthropic domain verification ---
-    @app.get("/.well-known/anthropic-connector-challenge")
-    async def anthropic_challenge():
-        token = os.environ.get("ANTHROPIC_CHALLENGE_TOKEN", "")
-        return JSONResponse({"challenge_token": token})
-
-    # --- HTML Pages ---
-    from fastapi.responses import HTMLResponse
-    import pathlib
-
-    def read_html(filename: str) -> str:
-        """Read HTML file from same directory as this script."""
-        base = pathlib.Path(__file__).parent
-        path = base / filename
-        if path.exists():
-            return path.read_text(encoding='utf-8')
-        return f"<html><body><h1>{filename} not found</h1></body></html>"
-
-    @app.get("/", response_class=HTMLResponse)
-    async def homepage():
-        return HTMLResponse(content=read_html("index.html"))
-
-    @app.get("/privacy", response_class=HTMLResponse)
-    async def privacy():
-        return HTMLResponse(content=read_html("privacy.html"))
-
-    @app.get("/terms", response_class=HTMLResponse)
-    async def terms():
-        return HTMLResponse(content=read_html("terms.html"))
-
-    @app.get("/documentation", response_class=HTMLResponse)
-    async def documentation():
-        return HTMLResponse(content=read_html("docs.html"))
-
-    @app.get("/cases", response_class=HTMLResponse)
-    async def cases():
-        return HTMLResponse(content=read_html("cases.html"))
-
-    @app.get("/feedback", response_class=HTMLResponse)
-    async def feedback_page():
-        return HTMLResponse(content=read_html("feedback.html"))
-
-    @app.post("/api/feedback")
-    async def submit_feedback(request: Request):
-        body = await request.json()
-        with sqlite3.connect(store.db_path) as conn:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS feedback (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    used_real TEXT DEFAULT '',
-                    pdf_feedback TEXT DEFAULT '',
-                    pricing_feedback TEXT DEFAULT '',
-                    email TEXT DEFAULT '',
-                    created_at TEXT DEFAULT (datetime('now'))
-                )
-            """)
-            conn.execute(
-                """INSERT INTO feedback (used_real, pdf_feedback, pricing_feedback, email) VALUES (?, ?, ?, ?)""",
-                (body.get("used_real", ""), body.get("pdf_feedback", ""), body.get("pricing_feedback", ""), body.get("email", ""))
-            )
-        return JSONResponse({"status": "ok", "message": "Thank you for your feedback."})
-
-    @app.get("/admin/feedback")
-    async def admin_feedback(request: Request):
-        key = request.query_params.get("key", "")
-        admin_key = os.environ.get("ZTR_ADMIN_KEY", "ztr-admin-2026")
-        if key != admin_key:
-            raise HTTPException(403, "Unauthorized")
-        with sqlite3.connect(store.db_path) as conn:
-            rows = conn.execute(
-                "SELECT id, used_real, pdf_feedback, pricing_feedback, email, created_at FROM feedback ORDER BY created_at DESC"
-            ).fetchall()
-        feedback_list = [{"id": r[0], "used_real": r[1], "pdf_feedback": r[2], "pricing": r[3], "email": r[4], "date": r[5]} for r in rows]
-        return JSONResponse({"total": len(feedback_list), "feedback": feedback_list})
-
-    from fastapi.responses import FileResponse
-
-    # ================================================================
-    # OAUTH 2.0 — Simplified for Claude Connectors Directory
-    # ================================================================
-
-    # Token store in SQLite (same DB as receipts)
-    with sqlite3.connect(store.db_path) as conn:
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS oauth_tokens (
-                token TEXT PRIMARY KEY,
-                user_id TEXT NOT NULL,
-                client_id TEXT NOT NULL,
-                code TEXT,
-                created_at TEXT DEFAULT (datetime('now')),
-                expires_at TEXT
-            )
-        """)
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS oauth_codes (
-                code TEXT PRIMARY KEY,
-                user_id TEXT NOT NULL,
-                client_id TEXT NOT NULL,
-                redirect_uri TEXT,
-                created_at TEXT DEFAULT (datetime('now')),
-                used INTEGER DEFAULT 0
-            )
-        """)
-
-    ZTR_CLIENT_ID = "ztr-claude-connector"
-    ZTR_SERVER_URL = os.environ.get("ZTR_SERVER_URL", "https://temporalregistry.com")
-
-    @app.get("/.well-known/oauth-authorization-server")
-    async def oauth_discovery():
-        """OAuth 2.0 Authorization Server Metadata (RFC 8414)"""
-        return JSONResponse({
-            "issuer": ZTR_SERVER_URL,
-            "authorization_endpoint": f"{ZTR_SERVER_URL}/oauth/authorize",
-            "token_endpoint": f"{ZTR_SERVER_URL}/oauth/token",
-            "response_types_supported": ["code"],
-            "grant_types_supported": ["authorization_code"],
-            "code_challenge_methods_supported": ["S256"],
-            "token_endpoint_auth_methods_supported": ["none"],
-        })
-
-    @app.get("/oauth/authorize")
-    async def oauth_authorize(
-        response_type: str = "code",
-        client_id: str = "",
-        redirect_uri: str = "",
-        state: str = "",
-        scope: str = "",
-        code_challenge: str = "",
-        code_challenge_method: str = "",
-    ):
-        """
-        OAuth authorize endpoint.
-        Shows a minimal consent page, then redirects back to Claude
-        with an authorization code.
-        """
-        from fastapi.responses import HTMLResponse
-        import urllib.parse
-
-        if not redirect_uri:
-            redirect_uri = "https://claude.ai/api/mcp/auth_callback"
-
-        # Generate auth code
-        code = str(uuid.uuid4())
-
-        # Store the code
-        with sqlite3.connect(store.db_path) as conn:
-            conn.execute(
-                """INSERT INTO oauth_codes (code, user_id, client_id, redirect_uri)
-                   VALUES (?, ?, ?, ?)""",
-                (code, "oauth-user", client_id or ZTR_CLIENT_ID, redirect_uri)
-            )
-
-        # Build consent page
-        consent_html = f"""
-        <!DOCTYPE html>
-        <html><head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>ZTR — Authorize</title>
-        <style>
-            body{{background:#0a0a0a;color:#f0ede6;font-family:'Inter',system-ui,sans-serif;
-                  display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0}}
-            .card{{background:#161616;border:1px solid #222;border-radius:8px;padding:40px;
-                   max-width:400px;text-align:center}}
-            h1{{font-size:20px;margin-bottom:8px;color:#c9a84c}}
-            p{{font-size:14px;color:#999;line-height:1.6;margin-bottom:24px}}
-            .perms{{text-align:left;background:#111;border:1px solid #222;border-radius:4px;
-                    padding:16px;margin-bottom:24px;font-size:13px;color:#bbb}}
-            .perms div{{padding:4px 0}}
-            .btn{{display:inline-block;background:#c9a84c;color:#0a0a0a;padding:12px 32px;
-                  border:none;border-radius:4px;font-size:14px;font-weight:600;cursor:pointer;
-                  text-decoration:none;letter-spacing:0.5px}}
-            .btn:hover{{background:#e8c97a}}
-        </style>
-        </head><body>
-        <div class="card">
-            <h1>ZTR — Temporal Registry</h1>
-            <p>Claude is requesting access to create and retrieve verification receipts on your behalf.</p>
-            <div class="perms">
-                <div>✓ Create verification receipts (hash + timestamp)</div>
-                <div>✓ Retrieve your past receipts</div>
-                <div>✗ Access to your documents (never stored)</div>
-            </div>
-            <a class="btn" href="/oauth/callback?code={code}&state={urllib.parse.quote(state)}&redirect_uri={urllib.parse.quote(redirect_uri)}">
-                Authorize ZTR
-            </a>
-        </div>
-        </body></html>
-        """
-        return HTMLResponse(content=consent_html)
-
-    @app.get("/oauth/callback")
-    async def oauth_callback(code: str, state: str = "", redirect_uri: str = ""):
-        """Internal callback that redirects to Claude with the auth code."""
-        from fastapi.responses import RedirectResponse
-        import urllib.parse
-
-        if not redirect_uri:
-            redirect_uri = "https://claude.ai/api/mcp/auth_callback"
-
-        separator = "&" if "?" in redirect_uri else "?"
-        target = f"{redirect_uri}{separator}code={code}"
-        if state:
-            target += f"&state={urllib.parse.quote(state)}"
-
-        return RedirectResponse(url=target)
-
-    @app.post("/oauth/token")
-    async def oauth_token(request: Request):
-        """Exchange authorization code for access token."""
-        # Handle both form-urlencoded and JSON
-        content_type = request.headers.get("content-type", "")
-        try:
-            if "json" in content_type:
-                body = await request.json()
-            else:
-                form = await request.form()
-                body = dict(form)
-        except Exception:
-            raise HTTPException(400, "Could not parse request body")
-
-        grant_type = body.get("grant_type", "")
-        code = body.get("code", "")
-
-        if grant_type != "authorization_code":
-            raise HTTPException(400, "unsupported grant_type")
-
-        if not code:
-            raise HTTPException(400, "code is required")
-
-        # Validate code
-        try:
-            with sqlite3.connect(store.db_path) as conn:
-                row = conn.execute(
-                    "SELECT user_id, client_id FROM oauth_codes WHERE code = ? AND used = 0",
-                    (code,)
-                ).fetchone()
-
-                if not row:
-                    raise HTTPException(400, "invalid or expired code")
-
-                user_id, client_id = row
-
-                # Mark code as used
-                conn.execute("UPDATE oauth_codes SET used = 1 WHERE code = ?", (code,))
-
-                # Generate access token
-                token = str(uuid.uuid4())
-                conn.execute(
-                    """INSERT INTO oauth_tokens (token, user_id, client_id)
-                       VALUES (?, ?, ?)""",
-                    (token, user_id, client_id)
-                )
-        except HTTPException:
-            raise
-        except Exception as e:
-            raise HTTPException(500, f"Token generation failed: {str(e)}")
-
-        return JSONResponse({
-            "access_token": token,
-            "token_type": "bearer",
-            "expires_in": 3600,
-            "scope": "verify:read verify:write",
-        })
-
-    def get_user_from_token(request: Request) -> str:
-        """Extract user_id from OAuth Bearer token or X-User-ID header."""
-        auth = request.headers.get("Authorization", "")
-        if auth.startswith("Bearer "):
-            token = auth[7:]
-            with sqlite3.connect(store.db_path) as conn:
-                row = conn.execute(
-                    "SELECT user_id FROM oauth_tokens WHERE token = ?", (token,)
-                ).fetchone()
-                if row:
-                    return row[0]
-        # Fallback to X-User-ID header (for testing / backward compatibility)
-        return request.headers.get("X-User-ID", "anonymous")
-
-    # ================================================================
-    # MCP PROTOCOL — JSON-RPC over Streamable HTTP
-    # ================================================================
-
-    @app.post("/mcp")
-    async def mcp_jsonrpc(request: Request):
-        """
-        MCP Streamable HTTP endpoint.
-        Receives JSON-RPC 2.0 messages and routes to tool handlers.
-        Methods: initialize, tools/list, tools/call
-        """
-        body = await request.json()
-        method = body.get("method", "")
-        params = body.get("params", {})
-        msg_id = body.get("id")
-        user_id = get_user_from_token(request)
-
-        # --- initialize ---
-        if method == "initialize":
-            return JSONResponse({
-                "jsonrpc": "2.0",
-                "id": msg_id,
-                "result": {
-                    "protocolVersion": "2025-03-26",
-                    "serverInfo": {
-                        "name": "ZTR — Temporal Registry",
-                        "version": "0.1",
-                    },
-                    "capabilities": {
-                        "tools": {"listChanged": False},
-                    },
-                },
-            })
-
-        # --- tools/list ---
-        if method == "tools/list":
-            return JSONResponse({
-                "jsonrpc": "2.0",
-                "id": msg_id,
-                "result": {
-                    "tools": MCP_TOOL_DEFINITIONS,
-                },
-            })
-
-        # --- tools/call ---
-        if method == "tools/call":
-            tool_name = params.get("name", "")
-            arguments = params.get("arguments", {})
-
-            try:
-                if tool_name == "verify_document":
-                    result = await _handle_verify(arguments, user_id, store)
-                elif tool_name == "check_receipt":
-                    result = await _handle_check(arguments, store)
-                elif tool_name == "list_receipts":
-                    result = await _handle_list(arguments, user_id, store)
-                elif tool_name == "download_receipt_pdf":
-                    result = await _handle_download_pdf(arguments, store)
-                else:
-                    return JSONResponse({
-                        "jsonrpc": "2.0",
-                        "id": msg_id,
-                        "error": {"code": -32601, "message": f"Unknown tool: {tool_name}"},
-                    })
-
-                return JSONResponse({
-                    "jsonrpc": "2.0",
-                    "id": msg_id,
-                    "result": {
-                        "content": [{"type": "text", "text": json.dumps(result)}],
-                    },
-                })
-
-            except Exception as e:
-                return JSONResponse({
-                    "jsonrpc": "2.0",
-                    "id": msg_id,
-                    "error": {"code": -32000, "message": str(e)},
-                })
-
-        # --- Unknown method ---
-        return JSONResponse({
-            "jsonrpc": "2.0",
-            "id": msg_id,
-            "error": {"code": -32601, "message": f"Unknown method: {method}"},
-        })
-
-    @app.get("/mcp")
-    async def mcp_discovery(request: Request):
-        """MCP discovery — returns Link header for OAuth."""
-        from fastapi.responses import Response
-        return Response(
-            content="",
-            status_code=200,
-            headers={
-                "Link": f'<{ZTR_SERVER_URL}/oauth/authorize>; rel="authorization"',
-            },
-        )
-
-    # --- MCP Tool Handlers (shared between REST and JSON-RPC) ---
-
-    async def _handle_verify(arguments: dict, user_id: str, store: ReceiptStore) -> dict:
-        """Handle verify_document tool call."""
-        document_text = arguments.get("document_text", "")
-        if not document_text:
-            raise ValueError("document_text is required")
-        if len(document_text) > 5_000_000:
-            raise ValueError("Document too large (max 5MB)")
-
-        # Daily quota check
-        DAILY_QUOTA = 10
-        today_start = datetime.now(timezone.utc).strftime('%Y-%m-%dT00:00:00')
-        today_receipts = store.list_by_user(user_id, date_from=today_start)
-        if len(today_receipts) >= DAILY_QUOTA:
-            return {
-                "status": "QUOTA_EXCEEDED",
-                "message": f"Technical preview fair-use quota reached ({DAILY_QUOTA} receipts/day). Quota resets at 00:00 UTC.",
-            }
-
-        # Global TSA budget check
-        DAILY_TSA_BUDGET = 5
-        use_tsa = True
-        with sqlite3.connect(store.db_path) as conn:
-            row = conn.execute(
-                """SELECT COUNT(*) FROM receipts
-                   WHERE tsa_status = 'VERIFIED'
-                   AND review_timestamp >= ?""",
-                (today_start,),
-            ).fetchone()
-            if row[0] >= DAILY_TSA_BUDGET:
-                use_tsa = False
-
-        receipt = create_receipt(
-            document_text=document_text,
-            user_id=user_id,
-            org_id="",
-            review_note=arguments.get("review_note", ""),
-            context=arguments.get("context", "legal_filing"),
-            use_tsa=use_tsa,
-        )
-        store.store(receipt)
-
-        result = {
-            "receipt_id": receipt.receipt_id,
-            "document_sha256": receipt.document_sha256,
-            "review_timestamp": receipt.review_timestamp,
-            "tsa_status": receipt.tsa_status,
-            "integrity_hmac": receipt.integrity_hmac[:16] + "...",
-            "context": receipt.context,
-            "message": (
-                f"Verification recorded. Receipt: {receipt.receipt_id}. "
-                f"Hash: {receipt.document_sha256[:16]}... "
-                f"Time: {receipt.review_timestamp}. "
-                f"TSA: {receipt.tsa_status}. "
-                f"Document was not stored."
-            ),
-        }
-
-        # Welcome message on first receipt
-        user_count = store.count_by_user(user_id)
-        if user_count == 1:
-            result["welcome_message"] = (
-                "Welcome to ZTR Early Access. Your verification has been recorded "
-                "with an eIDAS-qualified timestamp by Aruba PEC S.p.A. "
-                "We'd appreciate your feedback: temporalregistry.com/feedback"
-            )
-
-        return result
-
-    async def _handle_check(arguments: dict, store: ReceiptStore) -> dict:
-        """Handle check_receipt tool call."""
-        receipt_id = arguments.get("receipt_id", "")
-        if not receipt_id:
-            raise ValueError("receipt_id is required")
-
-        receipt = store.get(receipt_id)
-        if not receipt:
-            raise ValueError(f"Receipt {receipt_id} not found")
-
-        result = dict(receipt)
-        if result.get("tsa_token"):
-            result["tsa_token"] = result["tsa_token"][:32] + "...(truncated)"
-        return result
-
-    async def _handle_list(arguments: dict, user_id: str, store: ReceiptStore) -> dict:
-        """Handle list_receipts tool call."""
-        receipts = store.list_by_user(
-            user_id=user_id,
-            date_from=arguments.get("date_from"),
-            date_to=arguments.get("date_to"),
-            context=arguments.get("context"),
-        )
-        for r in receipts:
-            if r.get("tsa_token"):
-                r["tsa_token"] = "(stored)"
-        return {"count": len(receipts), "receipts": receipts}
-
-    async def _handle_download_pdf(arguments: dict, store: ReceiptStore) -> dict:
-        """Handle download_receipt_pdf tool call — returns URL to download."""
-        receipt_id = arguments.get("receipt_id", "")
-        if not receipt_id:
-            raise ValueError("receipt_id is required")
-        receipt = store.get(receipt_id)
-        if not receipt:
-            raise ValueError(f"Receipt {receipt_id} not found")
-        return {
-            "receipt_id": receipt_id,
-            "download_url": f"{ZTR_SERVER_URL}/receipt/{receipt_id}/pdf",
-            "message": f"PDF receipt available for download at: {ZTR_SERVER_URL}/receipt/{receipt_id}/pdf",
-        }
-
-    # ================================================================
-    # PDF DOWNLOAD ENDPOINT
-    # ================================================================
-
-    @app.get("/receipt/{receipt_id}/pdf")
-    async def download_receipt_pdf(receipt_id: str):
-        """Download a professional PDF receipt for a verification record."""
-        receipt = store.get(receipt_id)
-        if not receipt:
-            raise HTTPException(404, f"Receipt {receipt_id} not found")
-
-        import tempfile
-        from ztr_receipt_pdf import create_receipt_pdf
-
-        tmp = tempfile.NamedTemporaryFile(suffix='.pdf', delete=False)
-        create_receipt_pdf(
-            output_path=tmp.name,
-            receipt_id=receipt['receipt_id'],
-            document_sha256=receipt['document_sha256'],
-            review_timestamp=receipt['review_timestamp'],
-            review_note=receipt.get('review_note', ''),
-            context=receipt.get('context', 'other'),
-            user_id=receipt['user_id'],
-            tsa_status=receipt['tsa_status'],
-            integrity_hmac=receipt.get('integrity_hmac', ''),
-        )
-        return FileResponse(
-            tmp.name,
-            media_type='application/pdf',
-            filename=f'{receipt_id}.pdf',
-        )
-
-    # ================================================================
-    # ADMIN STATS (protected)
-    # ================================================================
-
-    @app.get("/admin/stats")
-    async def admin_stats(request: Request):
-        key = request.query_params.get("key", "")
-        admin_key = os.environ.get("ZTR_ADMIN_KEY", "ztr-admin-2026")
-        if key != admin_key:
-            raise HTTPException(403, "Unauthorized")
-
-        with sqlite3.connect(store.db_path) as conn:
-            conn.row_factory = sqlite3.Row
-
-            total = conn.execute("SELECT COUNT(*) as c FROM receipts").fetchone()["c"]
-            verified = conn.execute("SELECT COUNT(*) as c FROM receipts WHERE tsa_status='VERIFIED'").fetchone()["c"]
-            users = conn.execute("SELECT COUNT(DISTINCT user_id) as c FROM receipts").fetchone()["c"]
-
-            recent = [dict(r) for r in conn.execute(
-                """SELECT receipt_id, user_id, context, tsa_status,
-                   review_timestamp, review_note
-                   FROM receipts ORDER BY review_timestamp DESC LIMIT 20"""
-            ).fetchall()]
-
-            for r in recent:
-                r.pop('tsa_token', None)
-
-            return JSONResponse({
-                "total_receipts": total,
-                "verified_receipts": verified,
-                "unique_users": users,
-                "recent": recent,
-            })
-
-    # ================================================================
-    # FAVICON ROUTES
-    # ================================================================
-
-    @app.get("/favicon.ico")
-    async def favicon():
-        base = pathlib.Path(__file__).parent
-        return FileResponse(base / "favicon.ico", media_type="image/x-icon")
-
-    @app.get("/favicon.png")
-    async def favicon_png():
-        base = pathlib.Path(__file__).parent
-        return FileResponse(base / "favicon.png", media_type="image/png")
-
-    @app.get("/icon.png")
-    async def icon_png():
-        base = pathlib.Path(__file__).parent
-        return FileResponse(base / "favicon.png", media_type="image/png")
-
-    @app.get("/favicon-192.png")
-    async def favicon_192():
-        base = pathlib.Path(__file__).parent
-        return FileResponse(base / "favicon-192.png", media_type="image/png")
-
-    return app
-
-
-# ============================================================================
-# MCP TOOL DEFINITIONS — for Anthropic Connectors Directory
-# ============================================================================
-
-MCP_TOOL_DEFINITIONS = [
-    {
-        "name": "verify_document",
-        "title": "Verify Document",
-        "description": (
-            "[third_party_mcp_app] ZTR — Temporal Registry — Create a timestamped "
-            "record of human verification for an AI-assisted document. The document is "
-            "hashed (SHA-256), the professional's declaration is timestamped via an "
-            "eIDAS-qualified TSA (Aruba PEC S.p.A.), and a retrievable receipt with HMAC "
-            "integrity seal is returned. The document is immediately discarded — never "
-            "stored or transmitted beyond the hash. Use this before filing, submitting, "
-            "or approving any AI-assisted document — legal, medical, financial, "
-            "technical, or regulatory."
-        ),
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "document_text": {
-                    "type": "string",
-                    "description": (
-                        "The document text to verify. Hashed and immediately discarded. "
-                        "Never stored."
-                    ),
-                },
-                "review_note": {
-                    "type": "string",
-                    "description": "Optional note (e.g. 'Citations verified against Westlaw')",
-                    "default": "",
-                },
-                "context": {
-                    "type": "string",
-                    "enum": [
-                        "legal_filing", "contract_review", "legal_research",
-                        "client_advice",
-                        "regulatory_submission", "audit_compliance",
-                        "medical_review", "clinical_assessment", "diagnostic_report",
-                        "credit_assessment", "risk_evaluation", "financial_report",
-                        "hr_decision", "recruitment_screening",
-                        "education_evaluation", "academic_review",
-                        "technical_review", "safety_assessment",
-                        "project_approval", "document_handover",
-                        "internal_memo", "other",
-                    ],
-                    "default": "legal_filing",
-                },
-            },
-            "required": ["document_text"],
-        },
-        "annotations": {
-            "title": "Verify Document",
-            "readOnlyHint": False,
-            "destructiveHint": False,
-            "openWorldHint": True,
-        },
-    },
-    {
-        "name": "check_receipt",
-        "title": "Check Receipt",
-        "description": (
-            "[third_party_mcp_app] ZTR — Temporal Registry — Look up a verification "
-            "receipt by ID. Returns hash, timestamp, TSA status, and reviewer identity."
-        ),
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "receipt_id": {
-                    "type": "string",
-                    "description": "Receipt ID (format: ZTR-YYYYMMDDHHMMSS-XXXXXXXX)",
-                },
-            },
-            "required": ["receipt_id"],
-        },
-        "annotations": {
-            "title": "Check Receipt",
-            "readOnlyHint": True,
-            "destructiveHint": False,
-            "openWorldHint": False,
-        },
-    },
-    {
-        "name": "list_receipts",
-        "title": "List Receipts",
-        "description": (
-            "[third_party_mcp_app] ZTR — Temporal Registry — List your verification "
-            "receipts. Filter by date range or review context."
-        ),
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "date_from": {"type": "string", "description": "Start date (ISO 8601)"},
-                "date_to": {"type": "string", "description": "End date (ISO 8601)"},
-                "context": {"type": "string", "description": "Filter by context type"},
-            },
-            "required": [],
-        },
-        "annotations": {
-            "title": "List Receipts",
-            "readOnlyHint": True,
-            "destructiveHint": False,
-            "openWorldHint": False,
-        },
-    },
-    {
-        "name": "download_receipt_pdf",
-        "title": "Download Receipt PDF",
-        "description": (
-            "[third_party_mcp_app] ZTR — Temporal Registry — Download a professional PDF "
-            "receipt for a verification record. Includes QR code for independent verification, "
-            "full hash, eIDAS timestamp details, and legal disclaimer."
-        ),
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "receipt_id": {
-                    "type": "string",
-                    "description": "Receipt ID (format: ZTR-YYYYMMDDHHMMSS-XXXXXXXX)",
-                },
-            },
-            "required": ["receipt_id"],
-        },
-        "annotations": {
-            "title": "Download Receipt PDF",
-            "readOnlyHint": True,
-            "destructiveHint": False,
-            "openWorldHint": False,
-        },
-    },
-]
-
-
-# ============================================================================
-# ENTRY POINT
-# ============================================================================
-
-if __name__ == "__main__":
-    import uvicorn
-
-    port = int(os.environ.get("PORT", 8443))
-    print(f"""
-╔══════════════════════════════════════════════════════════════╗
-║  ZORTHEX™ TEMPORAL REGISTRY — REMOTE MCP CONNECTOR         ║
-║  Capsule lineage: v1.2 · TSA: Aruba PEC (eIDAS)            ║
-║  Host: temporalregistry.com · Port: {port}                   ║
-║  Documents are NEVER stored. Only 64-char SHA-256 hashes.   ║
-╚══════════════════════════════════════════════════════════════╝
-""")
-    app = create_app()
-    uvicorn.run(app, host="0.0.0.0", port=port)
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/png" sizes="64x64" href="/favicon.png">
+<link rel="apple-touch-icon" sizes="192x192" href="/favicon-192.png">
+<title>ZTR — Zorthex Temporal Registry · The Professional Declaration Standard</title>
+<meta name="description" content="Before you file, you declare. ZTR makes it tamper-evident, dated, and provable. The professional verification standard for AI-assisted work.">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --black:#0a0a0a;--dark:#111;--card:#161616;--border:#222;
+  --gold:#c9a84c;--gold-light:#e8c97a;--gold-dim:#7a6330;
+  --white:#f0ede6;--grey:#999;--dim:#555;--red:#8b1a1a;
+}
+body{background:var(--black);color:var(--white);font-family:'Inter',sans-serif;min-height:100vh;overflow-x:hidden}
+a{color:inherit;text-decoration:none}
+nav{display:flex;justify-content:space-between;align-items:center;padding:22px 60px;border-bottom:1px solid var(--border);position:sticky;top:0;background:rgba(10,10,10,0.97);backdrop-filter:blur(12px);z-index:100}
+.nav-logo{display:flex;align-items:center;gap:14px}
+.nav-mark{width:38px;height:38px;border:1.5px solid var(--gold);border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:12px;color:var(--gold);letter-spacing:1px}
+.nav-name{font-family:'Playfair Display',serif;font-size:15px;color:var(--white);letter-spacing:1px}
+.nav-sub{font-size:10px;color:var(--dim);letter-spacing:2px;text-transform:uppercase;margin-top:2px}
+.nav-links{display:flex;gap:32px;align-items:center}
+.nav-links a{color:var(--grey);font-size:12px;letter-spacing:0.5px;transition:color 0.2s}
+.nav-links a:hover{color:var(--gold)}
+.nav-badge{font-size:10px;color:var(--gold);border:1px solid var(--gold-dim);padding:4px 12px;letter-spacing:1px}
+.hero{max-width:860px;margin:0 auto;padding:80px 60px 60px;text-align:center}
+.hero-stamp{display:inline-block;border:1px solid var(--gold-dim);color:var(--gold);font-size:10px;letter-spacing:3px;text-transform:uppercase;padding:6px 20px;margin-bottom:44px}
+.hero h1{font-family:'Playfair Display',serif;font-size:48px;font-weight:700;color:var(--white);line-height:1.2;margin-bottom:20px}
+.hero h1 em{color:var(--gold);font-style:italic}
+.hero-divider{width:60px;height:1px;background:var(--gold-dim);margin:28px auto}
+.hero-sub{font-size:16px;color:var(--grey);line-height:1.85;max-width:620px;margin:0 auto 20px;font-weight:300}
+.hero-declaration{font-family:'Playfair Display',serif;font-size:20px;color:var(--gold);margin-top:24px;font-style:italic}
+.pillars{background:var(--dark);border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:60px}
+.pillars-inner{max-width:860px;margin:0 auto}
+.section-label{font-size:10px;color:var(--gold);letter-spacing:3px;text-transform:uppercase;margin-bottom:32px}
+.pillars-grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:1px;background:var(--border)}
+.pillar{background:var(--card);padding:32px 24px}
+.pillar-icon{font-size:11px;color:var(--gold-dim);letter-spacing:2px;text-transform:uppercase;margin-bottom:16px;font-family:'Playfair Display',serif}
+.pillar-title{font-size:14px;color:var(--white);font-weight:600;margin-bottom:10px}
+.pillar-body{font-size:12px;color:var(--grey);line-height:1.75}
+.pillar-body em{color:var(--gold);font-style:normal;font-weight:500}
+.comparison{background:var(--dark);border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:80px 60px}
+.comparison-inner{max-width:860px;margin:0 auto}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;padding:12px 20px;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--dim);border-bottom:1px solid var(--border)}
+th.ztr-col{color:var(--gold)}
+td{padding:16px 20px;font-size:13px;border-bottom:1px solid var(--border);color:var(--grey);line-height:1.6}
+td.label{color:var(--white);font-weight:500}
+td.without{color:var(--dim)}
+td.with{color:var(--white)}
+tr:last-child td{border-bottom:none}
+.how{max-width:860px;margin:80px auto;padding:0 60px}
+.steps{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:48px}
+.step{background:var(--card);border:1px solid var(--border);padding:28px}
+.step-num{font-family:'Playfair Display',serif;font-size:40px;color:var(--gold-dim);line-height:1;margin-bottom:16px}
+.step-title{font-size:14px;color:var(--white);font-weight:600;margin-bottom:10px}
+.step-body{font-size:12.5px;color:var(--grey);line-height:1.75}
+.step-example{font-family:monospace;font-size:11px;color:var(--gold);background:var(--dark);padding:10px 14px;margin-top:12px;border-left:2px solid var(--gold-dim)}
+.receipt{background:var(--dark);border:1px solid var(--gold-dim);padding:36px;margin-bottom:40px}
+.receipt-label{font-size:10px;color:var(--gold);letter-spacing:3px;text-transform:uppercase;margin-bottom:20px}
+.receipt-body{font-family:monospace;font-size:12.5px;line-height:2.2;color:var(--white)}
+.rf{color:var(--gold)}.rv{color:#a0c8a0}.rh{color:var(--dim)}
+.receipt-note{font-size:12px;color:var(--dim);margin-top:16px;font-style:italic}
+.declaration-box{background:var(--black);border:1px solid var(--border);border-left:3px solid var(--gold);padding:32px;margin-bottom:16px}
+.declaration-box h3{font-family:'Playfair Display',serif;font-size:18px;color:var(--white);margin-bottom:12px}
+.declaration-box p{font-size:13.5px;color:var(--grey);line-height:1.8}
+.not{background:var(--card);border:1px solid var(--border);padding:32px}
+.case{background:var(--card);border:1px solid var(--border);border-left:3px solid var(--gold-dim);padding:24px;max-width:860px;margin:0 auto}
+.case-id{font-size:10px;color:var(--gold-dim);letter-spacing:1.5px;margin-bottom:10px;font-family:monospace}
+.case-title{font-size:13px;color:var(--white);font-weight:600;margin-bottom:8px}
+.case-body{font-size:12px;color:var(--grey);line-height:1.7}
+.case-verdict{font-size:11px;color:var(--gold);margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
+.cta-section{max-width:860px;margin:80px auto;padding:0 60px;text-align:center}
+.cta-section h2{font-family:'Playfair Display',serif;font-size:32px;color:var(--white);margin-bottom:16px;line-height:1.3}
+.cta-section p{font-size:14px;color:var(--grey);margin-bottom:40px;line-height:1.8}
+.cta-group{display:flex;gap:16px;justify-content:center;flex-wrap:wrap}
+.cta-primary{background:var(--gold);color:var(--black);padding:14px 40px;font-size:12px;font-weight:600;letter-spacing:1px;text-transform:uppercase;transition:background 0.2s}
+.cta-primary:hover{background:var(--gold-light)}
+.cta-secondary{border:1px solid var(--gold-dim);color:var(--gold);padding:14px 40px;font-size:12px;letter-spacing:1px;text-transform:uppercase}
+.powered{font-size:11px;color:var(--dim);margin-top:32px;letter-spacing:0.5px;line-height:2}
+footer{border-top:1px solid var(--border);padding:40px 60px 80px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:20px}
+.footer-left{font-size:11px;color:var(--dim);line-height:2}
+.footer-right{display:flex;gap:24px}
+.footer-right a{font-size:11px;color:var(--dim);transition:color 0.2s}
+.footer-right a:hover{color:var(--gold)}
+@media(max-width:768px){
+nav{padding:16px 20px}.nav-links{gap:16px}
+.hero{padding:60px 20px 40px}.hero h1{font-size:30px}
+.pillars{padding:40px 20px}.pillars-grid{grid-template-columns:1fr 1fr}
+.comparison{padding:40px 20px}
+.how{padding:0 20px}.steps{grid-template-columns:1fr}
+.cta-section{padding:0 20px}
+footer{padding:32px 20px;flex-direction:column;align-items:flex-start}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">
+    <div class="nav-mark">ZTR</div>
+    <div>
+      <div class="nav-name">Temporal Registry</div>
+      <div class="nav-sub">Zorthex™ · Powered by Claude</div>
+    </div>
+  </div>
+  <div class="nav-links">
+    <a href="/documentation">Documentation</a>
+    <a href="/cases">Cases</a>
+    <a href="/feedback">Feedback</a>
+    <a href="/privacy">Privacy</a>
+    <a href="/terms">Terms</a>
+    <span class="nav-badge">eIDAS-QUALIFIED TIMESTAMPS</span>
+  </div>
+</nav>
+
+<!-- 1. EARLY ACCESS BANNER -->
+<div style="background:#1a1a2e;text-align:center;padding:10px 16px;border-bottom:1px solid #2a2a3e;">
+  <span style="font-size:11px;color:#d4aa4c;letter-spacing:2px;text-transform:uppercase">✦ NOW IN THE CLAUDE DIRECTORY</span>
+  <span style="font-size:11px;color:#999;margin-left:16px">Available to all Claude users worldwide. Early Access — free with feedback.</span>
+</div>
+
+<!-- 2. ARUBA eIDAS BOX -->
+<div style="background:#0d0d1a;text-align:center;padding:14px 20px;border-bottom:1px solid #1a1a2e;">
+  <span style="font-size:12px;color:#c8c8c8;letter-spacing:0.5px;">eIDAS-qualified timestamps by <strong style="color:#d4aa4c;">Aruba PEC S.p.A.</strong> — Qualified Trust Service Provider · Recognised in 27 EU countries and the United Kingdom · 30-year archival · RFC 3161</span>
+</div>
+
+<!-- 3. HERO + TWO BUTTONS -->
+<div class="hero">
+  <div class="hero-stamp">Professional Verification Standard · AI Compliance</div>
+  <h1>Before you file,<br>you declare.<br>ZTR makes it <em>provable</em>.</h1>
+  <div class="hero-divider"></div>
+  <p class="hero-sub">Every document you file contains an implicit statement: "I verified." ZTR makes it explicit, contemporaneous, and verifiable. In an era where artificial intelligence generates content indistinguishable from human work, the simple assertion "I verified" is no longer sufficient. The court cannot take your word for it. It must see the proof.</p>
+  <p class="hero-declaration">"This is not a click. This is a declaration."</p>
+  <div style="text-align:center;margin-top:24px;">
+    <a href="https://claude.ai/directory/connectors/ztr-temporal-registry" style="display:inline-block;padding:12px 28px;background:#d4aa4c;color:#1a1a2e;text-decoration:none;font-weight:bold;font-size:0.95rem;border-radius:4px;margin-right:12px;">Install from Claude Directory</a>
+    <a href="#enterprise" style="display:inline-block;padding:12px 28px;background:transparent;color:#d4aa4c;text-decoration:none;font-weight:bold;font-size:0.95rem;border-radius:4px;border:1px solid #d4aa4c;">Enterprise &amp; Partnership</a>
+  </div>
+</div>
+
+<!-- 4. FOUR PILLARS -->
+<div class="pillars">
+  <div class="pillars-inner">
+    <div class="section-label">What ZTR Records</div>
+    <div class="pillars-grid">
+      <div class="pillar">
+        <div class="pillar-icon">What</div>
+        <div class="pillar-title">Your professional declaration</div>
+        <div class="pillar-body">Your note, drafted at the moment of verification. <em>"Citations verified against Westlaw. No AI-generated content in Section 4. Client identity confirmed."</em> Your words, your judgment, your responsibility.</div>
+      </div>
+      <div class="pillar">
+        <div class="pillar-icon">When</div>
+        <div class="pillar-title">The exact moment</div>
+        <div class="pillar-body">An <em>eIDAS-qualified timestamp</em> from Aruba PEC S.p.A. — a Qualified Trust Service Provider recognised in 27 EU countries and the UK. Legally presumed accurate. Cannot be altered retroactively.</div>
+      </div>
+      <div class="pillar">
+        <div class="pillar-icon">Which document</div>
+        <div class="pillar-title">The SHA-256 fingerprint</div>
+        <div class="pillar-body">A 64-character cryptographic hash that <em>uniquely identifies the exact document</em> you reviewed. If a single character changes after verification, the hash no longer matches. The link is unbreakable.</div>
+      </div>
+      <div class="pillar">
+        <div class="pillar-icon">Who declares</div>
+        <div class="pillar-title">Your professional identity</div>
+        <div class="pillar-body">Your verified identity, traceable and <em>non-repudiable</em>. The declaration is attributed to you — the professional who reviewed the document — not to the AI that produced it.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 5. HOW IT WORKS -->
+<div class="how" style="margin-top:80px">
+  <div class="section-label">How ZTR Works</div>
+  <h2 style="font-family:'Playfair Display',serif;font-size:28px;color:var(--white);margin-bottom:40px">Four steps. One verifiable record.</h2>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">I</div>
+      <div class="step-title">Prepare your document</div>
+      <div class="step-body">The document you are about to file — drafted with or without AI assistance. Any content, any format. ZTR operates on the text passed to Claude.</div>
+    </div>
+    <div class="step">
+      <div class="step-num">II</div>
+      <div class="step-title">Write your professional declaration</div>
+      <div class="step-body">Tell Claude what you verified. This declaration becomes part of the permanent record — alongside the hash and the timestamp.</div>
+      <div class="step-example">"Citations verified against Westlaw. No AI hallucinations detected. Client name verified. Deadline confirmed."</div>
+    </div>
+    <div class="step">
+      <div class="step-num">III</div>
+      <div class="step-title">ZTR creates the contemporaneous record</div>
+      <div class="step-body">The document is hashed (SHA-256). Your declaration, the hash, and the timestamp are sealed together with an HMAC integrity check. Aruba PEC applies the eIDAS-qualified timestamp. The document is immediately discarded — never stored.</div>
+    </div>
+    <div class="step">
+      <div class="step-num">IV</div>
+      <div class="step-title">You receive your receipt</div>
+      <div class="step-body">A unique Receipt ID. Permanent. Retrievable at any time. If ever asked whether you can demonstrate that verification occurred — the answer is yes.</div>
+    </div>
+  </div>
+
+  <div class="receipt">
+    <div class="receipt-label">What a ZTR Receipt Contains</div>
+    <div class="receipt-body">
+<span class="rf">receipt_id</span>        ZTR-20260722143022-a7f3c891<br>
+<span class="rf">document_sha256</span>   <span class="rh">6576176c9194ee143b7b58271cf91fed8a4209...</span><br>
+<span class="rf">review_timestamp</span>   2026-07-22T14:30:22Z (UTC)<br>
+<span class="rf">review_note</span>       <span class="rv">"Citations verified against Westlaw. No AI-generated content in Sections 2-4. Client identity confirmed against file. Deadline: 2026-07-25."</span><br>
+<span class="rf">context</span>           legal_filing<br>
+<span class="rf">tsa_status</span>        VERIFIED · eIDAS · Aruba PEC S.p.A. · RFC 3161<br>
+<span class="rf">integrity_hmac</span>    5ca0df8d27258399a4e7db58d4f3bb...
+    </div>
+    <div class="receipt-note">The original document is not stored. Only the SHA-256 hash (64 characters) is retained. The document text is hashed and immediately discarded — it never leaves your environment.</div>
+  </div>
+
+  <div class="declaration-box">
+    <h3>This is not a click. This is a declaration.</h3>
+    <p>ZTR does not automate verification. It records your professional declaration of verification — at the moment it happens, before it is ever challenged. The legal value of ZTR lies in the contemporaneous nature of the record: it exists before the question is asked, not in response to it.</p>
+  </div>
+
+  <div class="not">
+    <h3 style="font-size:11px;color:var(--grey);letter-spacing:2px;text-transform:uppercase;margin-bottom:20px">What ZTR Does Not Do</h3>
+    <p style="font-size:13px;color:var(--dim);font-style:italic;margin-bottom:16px">Before we tell you what ZTR is, let us be clear about what it is not.</p>
+    <p style="font-size:13.5px;color:var(--grey);line-height:1.8;margin-bottom:20px">ZTR does not review your work. It does not check citations. It does not evaluate whether your verification was sufficient.</p>
+    <p style="font-size:14px;color:var(--white);font-weight:500;margin-bottom:12px">That is not a limitation. That is a feature.</p>
+    <p style="font-size:13.5px;color:var(--grey);line-height:1.8;margin-bottom:20px">Your professional judgment is irreplaceable. ZTR does not attempt to replace it — it protects it. It gives you the tool to say, with absolute certainty: <span style="color:var(--white);font-style:italic">"This is what I verified, this is when I verified it, and this is the document I verified."</span></p>
+    <p style="font-size:13.5px;color:var(--grey);line-height:1.8;margin-bottom:20px">The court will still evaluate your work. But now you can prove you did it.</p>
+    <p style="font-size:13px;color:var(--gold);font-style:italic">ZTR does not relieve you of the responsibility to do your work well.<br>ZTR relieves you of the risk of being unable to prove you did it.</p>
+  </div>
+</div>
+
+<!-- 6. COMPARISON TABLE -->
+<div class="comparison" style="margin-top:80px">
+  <div class="comparison-inner">
+    <h2 style="font-family:'Playfair Display',serif;color:var(--white);margin-bottom:40px">Without ZTR and with ZTR.</h2>
+    <table>
+      <thead><tr>
+        <th style="width:30%">Situation</th>
+        <th style="width:35%">Without ZTR</th>
+        <th class="ztr-col" style="width:35%">With ZTR</th>
+      </tr></thead>
+      <tbody>
+        <tr><td class="label">When challenged in court</td><td class="without">"I verified" — your word against the record</td><td class="with">A timestamped, tamper-evident, verifiable declaration</td></tr>
+        <tr><td class="label">Proof of timing</td><td class="without">No trace of when verification occurred</td><td class="with">Certain proof of the exact moment — eIDAS qualified</td></tr>
+        <tr><td class="label">Document integrity</td><td class="without">The document may have been modified after review</td><td class="with">SHA-256 hash links declaration to the specific document</td></tr>
+        <tr><td class="label">Under disciplinary review</td><td class="without">Only memories and retrospective notes</td><td class="with">Receipt ID enabling immediate retrieval of the contemporaneous record</td></tr>
+        <tr><td class="label">Firm AI policy compliance</td><td class="without">Policy exists on paper — no proof it was followed</td><td class="with">Per-document proof that the policy was applied</td></tr>
+        <tr><td class="label">Sanctions exposure</td><td class="without">The court converts absence into evidence of fault</td><td class="with">The record exists before it is ever needed</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- 7. ENTERPRISE & PARTNERSHIP -->
+<section id="enterprise" style="padding:60px 20px;max-width:900px;margin:0 auto;text-align:center;">
+  <h2 style="color:#d4aa4c;font-size:1.6rem;margin-bottom:12px;">Enterprise &amp; Partnership</h2>
+  <p style="color:#c8c8c8;font-size:1rem;line-height:1.7;max-width:700px;margin:0 auto 24px;">ZTR is available for enterprise integration, volume licensing, and strategic partnerships. If you represent a law firm, a Qualified Trust Service Provider, a compliance platform, or an organisation seeking AI governance solutions — we'd like to hear from you.</p>
+  <a href="mailto:admin@temporalregistry.com?subject=Enterprise%20Inquiry%20—%20ZTR" style="display:inline-block;padding:12px 32px;background:#d4aa4c;color:#1a1a2e;text-decoration:none;font-weight:bold;font-size:0.95rem;border-radius:4px;">Contact for Enterprise &amp; Partnership</a>
+</section>
+
+<!-- 8. ONE CASE EXAMPLE + LINK -->
+<div style="max-width:860px;margin:40px auto 0;padding:0 60px">
+  <div class="section-label">The Evidentiary Standard Has Changed</div>
+  <p style="font-family:'Playfair Display',serif;font-size:20px;color:var(--white);line-height:1.5;margin-bottom:32px">Courts across four jurisdictions have established that the absence of a contemporaneous verification record is treated as evidence of fault — independent of whether an error was made.</p>
+  <div class="case">
+    <div class="case-id">Miller v. Regions Bank · N.D. Alabama · 2026</div>
+    <div class="case-title">The Two-Track Doctrine</div>
+    <div class="case-body">AI hallucinations in a federal brief. The error received a public reprimand. The destruction of the ChatGPT account — eliminating all contemporaneous record — received adverse inference, contempt, and a six-month suspension.</div>
+    <div class="case-verdict">The sanction was for the missing record, not the error.</div>
+  </div>
+  <p style="text-align:center;margin-top:20px;">
+    <a href="/cases" style="color:#d4aa4c;text-decoration:none;font-size:0.95rem;">See all four cases across US, UK, and Canada that established the precedent →</a>
+  </p>
+</div>
+
+<!-- 9. CTA EARLY ACCESS -->
+<div class="cta-section" style="margin-top:80px;margin-bottom:80px">
+  <div class="section-label">The Professional Standard</div>
+  <h2 style="font-family:'Playfair Display',serif;font-size:32px;color:var(--white);margin-bottom:16px;line-height:1.3">The question is no longer whether to verify.<br>It is whether you can prove you did.</h2>
+  <p>ZTR is now listed in the official Claude Connectors Directory. Install it from the Directory, verify your first document, and help shape the product with your feedback. Early Access is free — all we ask is that you tell us what works and what doesn't.</p>
+  <div class="cta-group">
+    <a href="https://claude.ai/directory/connectors/ztr-temporal-registry" class="cta-primary">Install from Claude Directory →</a>
+    <a href="/documentation" class="cta-secondary">Read Documentation</a>
+  </div>
+  <div class="powered">
+    Zorthex™ · Powered by Claude · eIDAS-Qualified Timestamps via Aruba PEC S.p.A.<br>
+    Built on the Zorthex L₂ research framework · doi.org/10.5281/zenodo.20589503<br>
+    UIBM Trademark N.302026000090628
+  </div>
+</div>
+
+<!-- 10. FOOTER -->
+<footer>
+  <div class="footer-left">
+    © 2026 Renato Santi — ZORTHEX™ (Trademark UIBM N.302026000090628)<br>
+    Zorthex Temporal Registry · temporalregistry.com · zorthex.official@gmail.com
+  </div>
+  <div class="footer-right">
+    <a href="/documentation">Documentation</a>
+    <a href="/cases">Cases</a>
+    <a href="/privacy">Privacy Policy</a>
+    <a href="/terms">Terms of Service</a>
+  </div>
+</footer>
+
+<!-- STICKY INSTALL BAR -->
+<div id="sticky-install" style="
+  position:fixed;bottom:0;left:0;right:0;
+  background:#1a1a2e;padding:12px 20px;text-align:center;
+  z-index:1000;display:flex;align-items:center;justify-content:center;gap:16px;
+  border-top:1px solid #d4aa4c;animation:borderPulse 3s ease-in-out infinite;">
+  <span style="color:#c8c8c8;font-size:0.9rem;">ZTR is live in the Claude Directory</span>
+  <a href="https://claude.ai/directory/connectors/ztr-temporal-registry" 
+     style="display:inline-block;padding:8px 24px;background:#d4aa4c;color:#1a1a2e;
+            text-decoration:none;font-weight:bold;font-size:0.85rem;border-radius:4px;
+            animation:btnGlow 3s ease-in-out infinite;">Install Now</a>
+</div>
+
+<style>
+@keyframes borderPulse {
+  0%,100%{border-top-color:rgba(212,170,76,0.3);box-shadow:0 -2px 8px rgba(212,170,76,0)}
+  50%{border-top-color:rgba(212,170,76,1);box-shadow:0 -2px 12px rgba(212,170,76,0.3)}
+}
+@keyframes btnGlow {
+  0%,100%{box-shadow:0 0 4px rgba(212,170,76,0.2)}
+  50%{box-shadow:0 0 16px rgba(212,170,76,0.5),0 0 4px rgba(212,170,76,0.3)}
+}
+</style>
+
+<script>
+const hero=document.querySelector('.hero');
+if(hero){const o=new IntersectionObserver(e=>{
+  document.getElementById('sticky-install').style.display=e[0].isIntersecting?'none':'flex';
+},{threshold:0.1});o.observe(hero);}
+</script>
+
+</body>
+</html>
