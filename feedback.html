@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/png" sizes="64x64" href="/favicon.png">
+<title>Feedback — Zorthex Temporal Registry</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0a;color:#f0ede6;font-family:'Inter',sans-serif;min-height:100vh}
+nav{display:flex;justify-content:space-between;align-items:center;padding:22px 60px;border-bottom:1px solid #222;background:rgba(10,10,10,0.97)}
+.nav-logo{display:flex;align-items:center;gap:14px}
+.nav-mark{width:38px;height:38px;border:1.5px solid #c9a84c;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:12px;color:#c9a84c;letter-spacing:1px}
+.nav-name{font-family:'Playfair Display',serif;font-size:15px;color:#f0ede6;letter-spacing:1px}
+.nav-sub{font-size:10px;color:#555;letter-spacing:2px;text-transform:uppercase;margin-top:2px}
+.nav-links{display:flex;gap:32px;align-items:center}
+.nav-links a{color:#999;font-size:12px;text-decoration:none}
+.nav-links a:hover{color:#c9a84c}
+.fb-option{padding:8px 20px;background:transparent;border:1px solid #2a2a3e;color:#c8c8c8;border-radius:4px;cursor:pointer;font-size:0.9rem;transition:all 0.2s}
+.fb-option:hover{border-color:#d4aa4c;color:#d4aa4c}
+.fb-option.selected{background:#d4aa4c;color:#1a1a2e;border-color:#d4aa4c;font-weight:bold}
+.foot{font-size:11px;color:#444;text-align:center;padding:32px;border-top:1px solid #222;margin-top:60px}
+.foot a{color:#c9a84c;text-decoration:none}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="/" style="text-decoration:none">
+  <div class="nav-logo">
+    <div class="nav-mark">ZTR</div>
+    <div><div class="nav-name">Temporal Registry</div><div class="nav-sub">Zorthex™ · Powered by Claude</div></div>
+  </div>
+  </a>
+  <div class="nav-links">
+    <a href="/documentation">Documentation</a>
+    <a href="/cases">Cases</a>
+    <a href="/feedback" style="color:#c9a84c">Feedback</a>
+    <a href="/privacy">Privacy</a>
+    <a href="/terms">Terms</a>
+  </div>
+</nav>
+
+<section style="padding:60px 20px;max-width:700px;margin:0 auto;">
+  <h1 style="color:#d4aa4c;font-size:1.8rem;text-align:center;margin-bottom:8px;font-family:'Playfair Display',serif">Early Access Feedback</h1>
+  <p style="color:#999;text-align:center;font-size:0.95rem;margin-bottom:40px;">Help shape ZTR. Three questions, two minutes.</p>
+
+  <div id="feedback-form">
+
+    <div style="margin-bottom:32px;">
+      <label style="color:#e0e0e0;font-size:0.95rem;display:block;margin-bottom:12px;">1. Have you used ZTR to verify a document before a real filing, submission, or client delivery?</label>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;">
+        <button class="fb-option" data-q="used_real" data-v="yes" onclick="selectOption(this)">Yes</button>
+        <button class="fb-option" data-q="used_real" data-v="no" onclick="selectOption(this)">No</button>
+        <button class="fb-option" data-q="used_real" data-v="not_yet" onclick="selectOption(this)">Not yet</button>
+      </div>
+    </div>
+
+    <div style="margin-bottom:32px;">
+      <label style="color:#e0e0e0;font-size:0.95rem;display:block;margin-bottom:12px;">2. Is the PDF receipt clear enough to attach to a professional file? What would you add or change?</label>
+      <textarea id="pdf_feedback" rows="4" style="width:100%;background:#1a1a2e;border:1px solid #2a2a3e;color:#e0e0e0;padding:12px;border-radius:4px;font-size:0.9rem;resize:vertical;font-family:'Inter',sans-serif" placeholder="Your thoughts on the PDF receipt..."></textarea>
+    </div>
+
+    <div style="margin-bottom:32px;">
+      <label style="color:#e0e0e0;font-size:0.95rem;display:block;margin-bottom:12px;">3. At launch, ZTR will cost €6 per receipt (includes eIDAS-qualified timestamp + PDF + independent verification). Would you pass this cost to your client as a documented expense?</label>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;">
+        <button class="fb-option" data-q="pricing" data-v="yes_easily" onclick="selectOption(this)">Yes, easily</button>
+        <button class="fb-option" data-q="pricing" data-v="probably" onclick="selectOption(this)">Probably</button>
+        <button class="fb-option" data-q="pricing" data-v="too_expensive" onclick="selectOption(this)">Too expensive</button>
+        <button class="fb-option" data-q="pricing" data-v="other" onclick="selectOption(this)">Other</button>
+      </div>
+    </div>
+
+    <div style="margin-bottom:32px;">
+      <label style="color:#e0e0e0;font-size:0.95rem;display:block;margin-bottom:12px;">4. Email (optional — only if you'd like us to follow up)</label>
+      <input type="email" id="email" style="width:100%;background:#1a1a2e;border:1px solid #2a2a3e;color:#e0e0e0;padding:12px;border-radius:4px;font-size:0.9rem;font-family:'Inter',sans-serif" placeholder="you@firm.com">
+    </div>
+
+    <div style="text-align:center;">
+      <button id="submit-btn" onclick="submitFeedback()" style="padding:14px 40px;background:#d4aa4c;color:#1a1a2e;border:none;font-weight:bold;font-size:1rem;border-radius:4px;cursor:pointer;">Submit Feedback</button>
+    </div>
+  </div>
+
+  <div id="thank-you" style="display:none;text-align:center;padding:60px 0;">
+    <h2 style="color:#d4aa4c;margin-bottom:16px;font-family:'Playfair Display',serif">Thank you.</h2>
+    <p style="color:#c8c8c8;font-size:1rem;">Your feedback directly influences how ZTR evolves. We read every response.</p>
+  </div>
+
+</section>
+
+<div class="foot">
+  <a href="/">Home</a> · <a href="/documentation">Documentation</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a><br><br>
+  © 2026 Renato Santi — ZORTHEX™ · Powered by Claude · temporalregistry.com
+</div>
+
+<script>
+const answers={};
+function selectOption(btn){
+  const q=btn.dataset.q,v=btn.dataset.v;
+  document.querySelectorAll(`.fb-option[data-q="${q}"]`).forEach(b=>b.classList.remove('selected'));
+  btn.classList.add('selected');answers[q]=v;
+}
+async function submitFeedback(){
+  const btn=document.getElementById('submit-btn');
+  btn.textContent='Sending...';btn.disabled=true;
+  const body={used_real:answers.used_real||'',pdf_feedback:document.getElementById('pdf_feedback').value.trim(),pricing_feedback:answers.pricing||'',email:document.getElementById('email').value.trim()};
+  try{const res=await fetch('/api/feedback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    if(res.ok){document.getElementById('feedback-form').style.display='none';document.getElementById('thank-you').style.display='block';}
+    else{btn.textContent='Error — try again';btn.disabled=false;}
+  }catch(e){btn.textContent='Error — try again';btn.disabled=false;}
+}
+</script>
+
+</body>
+</html>
