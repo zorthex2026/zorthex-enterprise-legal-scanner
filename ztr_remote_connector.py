@@ -967,6 +967,7 @@ def create_app():
         # Global TSA budget check
         DAILY_TSA_BUDGET = 5
         use_tsa = True
+        tsa_limit_reached = False
         with sqlite3.connect(store.db_path) as conn:
             row = conn.execute(
                 """SELECT COUNT(*) FROM receipts
@@ -976,6 +977,7 @@ def create_app():
             ).fetchone()
             if row[0] >= DAILY_TSA_BUDGET:
                 use_tsa = False
+                tsa_limit_reached = True
 
         receipt = create_receipt(
             document_text=document_text if hash_source == "text" else "",
@@ -986,7 +988,25 @@ def create_app():
             use_tsa=use_tsa,
             pre_computed_hash=doc_hash if hash_source == "binary_file" else None,
         )
+
+        # Override tsa_status with clear message when limit reached
+        if tsa_limit_reached:
+            receipt.tsa_status = "DAILY_LIMIT_REACHED"
+
         store.store(receipt)
+
+        # Build response message based on TSA status
+        if tsa_limit_reached:
+            tsa_message = (
+                "The daily limit of qualified timestamps has been reached. "
+                "Your verification has been recorded with hash, timestamp, and HMAC "
+                "but without an eIDAS-qualified timestamp. "
+                "The limit resets at 00:00 UTC."
+            )
+        elif receipt.tsa_status == "VERIFIED":
+            tsa_message = "Verification recorded with eIDAS-qualified timestamp."
+        else:
+            tsa_message = f"Verification recorded. TSA status: {receipt.tsa_status}."
 
         result = {
             "receipt_id": receipt.receipt_id,
@@ -997,11 +1017,10 @@ def create_app():
             "context": receipt.context,
             "pdf_url": f"{ZTR_SERVER_URL}/receipt/{receipt.receipt_id}/pdf",
             "message": (
-                f"Verification recorded with eIDAS-qualified timestamp. "
+                f"{tsa_message} "
                 f"Receipt: {receipt.receipt_id}. "
                 f"Hash: {receipt.document_sha256[:16]}... "
                 f"Time: {receipt.review_timestamp}. "
-                f"TSA: {receipt.tsa_status}. "
                 f"Document was not stored. "
                 f"PDF receipt ready for download."
             ),
