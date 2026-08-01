@@ -234,19 +234,23 @@ def create_receipt(
     review_note: str = "",
     context: str = "legal_filing",
     use_tsa: bool = True,
+    pre_computed_hash: str = None,
 ) -> VerificationReceipt:
     """
     Core receipt creation — the remote equivalent of capsule generation.
 
-    1. Hash the document (SHA-256)
+    1. Hash the document (SHA-256) or use pre-computed hash for binary files
     2. Discard the document text (NEVER stored)
     3. Record timestamp
     4. Call Aruba TSA if enabled (eIDAS qualified)
     5. Seal with HMAC
     6. Return receipt
     """
-    # Step 1: Hash
-    doc_hash = compute_sha256(document_text)
+    # Step 1: Hash (pre-computed for binary files, computed for text)
+    if pre_computed_hash:
+        doc_hash = pre_computed_hash
+    else:
+        doc_hash = compute_sha256(document_text)
 
     # Step 2: Document text is now dead to us
     # (Python GC will handle it; we never assign it to any persistent store)
@@ -930,8 +934,23 @@ def create_app():
     async def _handle_verify(arguments: dict, user_id: str, store: ReceiptStore) -> dict:
         """Handle verify_document tool call."""
         document_text = arguments.get("document_text", "")
-        if not document_text:
-            raise ValueError("document_text is required")
+        file_content_base64 = arguments.get("file_content_base64", "")
+
+        if not document_text and not file_content_base64:
+            raise ValueError("document_text or file_content_base64 is required")
+
+        # Compute hash: binary file takes priority over text
+        if file_content_base64:
+            try:
+                file_bytes = base64.b64decode(file_content_base64)
+                doc_hash = hashlib.sha256(file_bytes).hexdigest()
+                hash_source = "binary_file"
+            except Exception as e:
+                raise ValueError(f"Invalid base64 content: {str(e)}")
+        else:
+            doc_hash = compute_sha256(document_text)
+            hash_source = "text"
+
         if len(document_text) > 5_000_000:
             raise ValueError("Document too large (max 5MB)")
 
@@ -959,12 +978,13 @@ def create_app():
                 use_tsa = False
 
         receipt = create_receipt(
-            document_text=document_text,
+            document_text=document_text if hash_source == "text" else "",
             user_id=user_id,
             org_id="",
             review_note=arguments.get("review_note", ""),
             context=arguments.get("context", "legal_filing"),
             use_tsa=use_tsa,
+            pre_computed_hash=doc_hash if hash_source == "binary_file" else None,
         )
         store.store(receipt)
 
@@ -975,12 +995,15 @@ def create_app():
             "tsa_status": receipt.tsa_status,
             "integrity_hmac": receipt.integrity_hmac[:16] + "...",
             "context": receipt.context,
+            "pdf_url": f"{ZTR_SERVER_URL}/receipt/{receipt.receipt_id}/pdf",
             "message": (
-                f"Verification recorded. Receipt: {receipt.receipt_id}. "
+                f"Verification recorded with eIDAS-qualified timestamp. "
+                f"Receipt: {receipt.receipt_id}. "
                 f"Hash: {receipt.document_sha256[:16]}... "
                 f"Time: {receipt.review_timestamp}. "
                 f"TSA: {receipt.tsa_status}. "
-                f"Document was not stored."
+                f"Document was not stored. "
+                f"PDF receipt ready for download."
             ),
         }
 
@@ -1155,7 +1178,16 @@ MCP_TOOL_DEFINITIONS = [
                     "type": "string",
                     "description": (
                         "The document text to verify. Hashed and immediately discarded. "
-                        "Never stored."
+                        "Never stored. Use this for text documents or when pasting content directly."
+                    ),
+                },
+                "file_content_base64": {
+                    "type": "string",
+                    "description": (
+                        "Base64-encoded binary content of the original file (PDF, DOCX, etc.). "
+                        "When provided, the SHA-256 hash is computed on the original binary file, "
+                        "not on extracted text. This ensures the hash matches the actual file. "
+                        "Use this when the user uploads a file for verification."
                     ),
                 },
                 "review_note": {
