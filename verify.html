@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/png" sizes="64x64" href="/favicon.png">
+<title>Independent Verification — Zorthex Temporal Registry</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0a;color:#f0ede6;font-family:'Inter',sans-serif;min-height:100vh}
+nav{display:flex;justify-content:space-between;align-items:center;padding:22px 60px;border-bottom:1px solid #222;background:rgba(10,10,10,0.97)}
+.nav-logo{display:flex;align-items:center;gap:14px}
+.nav-mark{width:38px;height:38px;border:1.5px solid #c9a84c;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:12px;color:#c9a84c;letter-spacing:1px}
+.nav-name{font-family:'Playfair Display',serif;font-size:15px;color:#f0ede6;letter-spacing:1px}
+.nav-sub{font-size:10px;color:#555;letter-spacing:2px;text-transform:uppercase;margin-top:2px}
+.nav-links{display:flex;gap:32px;align-items:center}
+.nav-links a{color:#999;font-size:12px;text-decoration:none}
+.nav-links a:hover{color:#c9a84c}
+.foot{font-size:11px;color:#444;text-align:center;padding:32px;border-top:1px solid #222;margin-top:48px}
+.foot a{color:#c9a84c;text-decoration:none}
+@media(max-width:768px){nav{padding:16px 20px}.nav-links{gap:16px}}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="/" style="text-decoration:none">
+  <div class="nav-logo">
+    <div class="nav-mark">ZTR</div>
+    <div><div class="nav-name">Temporal Registry</div><div class="nav-sub">Zorthex™ · Powered by Claude</div></div>
+  </div>
+  </a>
+  <div class="nav-links">
+    <a href="/documentation">Documentation</a>
+    <a href="/cases">Cases</a>
+    <a href="/verify" style="color:#c9a84c">Verify</a>
+    <a href="/feedback">Feedback</a>
+    <a href="/privacy">Privacy</a>
+    <a href="/terms">Terms</a>
+  </div>
+</nav>
+
+<section style="padding:60px 20px;max-width:700px;margin:0 auto;">
+  <h1 style="color:#d4aa4c;font-size:1.8rem;text-align:center;margin-bottom:8px;font-family:'Playfair Display',serif;">Independent Verification</h1>
+  <p style="color:#999;text-align:center;font-size:0.95rem;margin-bottom:40px;">Verify any ZTR receipt without an account. Two methods, same result.</p>
+
+  <div style="margin-bottom:48px;">
+    <h2 style="color:#e0e0e0;font-size:1.1rem;margin-bottom:16px;">Option 1 — Verify by Receipt ID</h2>
+    <p style="color:#999;font-size:0.85rem;margin-bottom:12px;">Enter the Receipt ID from the PDF receipt or QR code (e.g. ZTR-20260801-...)</p>
+    <div style="display:flex;gap:12px;">
+      <input type="text" id="receipt-id-input" placeholder="ZTR-20260801162207-289dc51c" style="flex:1;background:#1a1a2e;border:1px solid #2a2a3e;color:#e0e0e0;padding:12px;border-radius:4px;font-size:0.9rem;font-family:monospace;">
+      <button onclick="verifyById()" style="padding:12px 24px;background:#d4aa4c;color:#1a1a2e;border:none;font-weight:bold;font-size:0.9rem;border-radius:4px;cursor:pointer;">Verify</button>
+    </div>
+    <div id="result-id" style="margin-top:16px;"></div>
+  </div>
+
+  <div style="margin-bottom:48px;">
+    <h2 style="color:#e0e0e0;font-size:1.1rem;margin-bottom:16px;">Option 2 — Verify by Document Hash</h2>
+    <p style="color:#999;font-size:0.85rem;margin-bottom:12px;">Paste the SHA-256 hash of your document's text content to check if it matches any receipt.</p>
+    <div style="display:flex;gap:12px;">
+      <input type="text" id="hash-input" placeholder="5ab4b6251fd5783b..." style="flex:1;background:#1a1a2e;border:1px solid #2a2a3e;color:#e0e0e0;padding:12px;border-radius:4px;font-size:0.9rem;font-family:monospace;">
+      <button onclick="verifyByHash()" style="padding:12px 24px;background:#d4aa4c;color:#1a1a2e;border:none;font-weight:bold;font-size:0.9rem;border-radius:4px;cursor:pointer;">Verify</button>
+    </div>
+    <div id="result-hash" style="margin-top:16px;"></div>
+  </div>
+
+  <div style="border-top:1px solid #2a2a3e;padding-top:32px;">
+    <h2 style="color:#e0e0e0;font-size:1.1rem;margin-bottom:16px;">How independent verification works</h2>
+    <p style="color:#c8c8c8;font-size:0.9rem;line-height:1.7;margin-bottom:12px;"><strong style="color:#d4aa4c;">Level 1 — Receipt lookup.</strong> Enter the Receipt ID above. If found, the receipt exists in the ZTR registry and has not been fabricated.</p>
+    <p style="color:#c8c8c8;font-size:0.9rem;line-height:1.7;margin-bottom:12px;"><strong style="color:#d4aa4c;">Level 2 — Hash match.</strong> Copy the text of the original document into any SHA-256 calculator. If the hash matches the one on the receipt, the document has not been modified since verification. This step does not require trusting ZTR.</p>
+    <p style="color:#c8c8c8;font-size:0.9rem;line-height:1.7;"><strong style="color:#d4aa4c;">Level 3 — Qualified timestamp.</strong> The timestamp on each VERIFIED receipt was issued by Aruba PEC S.p.A., a Qualified Trust Service Provider under EU Regulation 910/2014 (eIDAS). The timestamp token can be verified independently using any RFC 3161 validation tool. This does not require trusting ZTR or the professional — the date is guaranteed by a qualified third party recognised across 27 EU countries.</p>
+  </div>
+</section>
+
+<div class="foot">
+  <a href="/">Home</a> · <a href="/documentation">Documentation</a> · <a href="/cases">Cases</a> · <a href="/feedback">Feedback</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a><br><br>
+  © 2026 Renato Santi — ZORTHEX™ · Powered by Claude · temporalregistry.com
+</div>
+
+<script>
+async function verifyById(){
+  const id=document.getElementById('receipt-id-input').value.trim();
+  const div=document.getElementById('result-id');
+  if(!id){div.innerHTML='';return;}
+  div.innerHTML='<p style="color:#999">Checking...</p>';
+  try{
+    const res=await fetch('/verify/'+encodeURIComponent(id));
+    const data=await res.json();
+    if(data.status==='FOUND'){
+      const r=data.receipt;
+      div.innerHTML=`<div style="background:#1a2e1a;border:1px solid #2a4a2a;padding:16px;border-radius:4px;">
+        <p style="color:#4caf50;font-weight:bold;margin-bottom:8px;">✓ Receipt found</p>
+        <p style="color:#c8c8c8;font-size:0.85rem;line-height:1.8;font-family:monospace;">
+          Receipt ID: ${r.receipt_id}<br>Timestamp: ${r.timestamp}<br>TSA Status: ${r.tsa_status}<br>Document Hash: ${r.document_hash}<br>Context: ${r.context}</p>
+        <p style="color:#999;font-size:0.8rem;margin-top:12px;font-style:italic;">${data.verification_note}</p></div>`;
+    }else{
+      div.innerHTML=`<div style="background:#2e1a1a;border:1px solid #4a2a2a;padding:16px;border-radius:4px;">
+        <p style="color:#f44336;font-weight:bold;">✗ No receipt found with this ID</p></div>`;
+    }
+  }catch(e){div.innerHTML='<p style="color:#f44336">Error</p>';}
+}
+async function verifyByHash(){
+  const hash=document.getElementById('hash-input').value.trim();
+  const div=document.getElementById('result-hash');
+  if(!hash){div.innerHTML='';return;}
+  div.innerHTML='<p style="color:#999">Checking...</p>';
+  try{
+    const res=await fetch('/verify/check-hash',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({hash:hash})});
+    const data=await res.json();
+    if(data.status==='MATCH_FOUND'){
+      let html=`<div style="background:#1a2e1a;border:1px solid #2a4a2a;padding:16px;border-radius:4px;">
+        <p style="color:#4caf50;font-weight:bold;margin-bottom:8px;">✓ ${data.message}</p>`;
+      data.matches.forEach(m=>{html+=`<p style="color:#c8c8c8;font-size:0.85rem;line-height:1.8;font-family:monospace;margin-top:8px;">
+        Receipt: ${m.receipt_id}<br>Timestamp: ${m.timestamp}<br>Status: ${m.tsa_status}<br>Context: ${m.context}</p>`;});
+      html+='</div>';div.innerHTML=html;
+    }else{
+      div.innerHTML=`<div style="background:#2e1a1a;border:1px solid #4a2a2a;padding:16px;border-radius:4px;">
+        <p style="color:#f44336;font-weight:bold;">✗ No receipt matches this hash</p></div>`;
+    }
+  }catch(e){div.innerHTML='<p style="color:#f44336">Error</p>';}
+}
+</script>
+
+</body>
+</html>
