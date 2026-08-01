@@ -637,7 +637,7 @@ def create_app():
     async def verify_hash(request: Request):
         """Check if a document hash matches any receipt — public, no auth."""
         body = await request.json()
-        doc_hash = body.get("hash", "").strip()
+        doc_hash = body.get("hash", "").strip().replace("\n", "").replace("\r", "").replace(" ", "")
         if not doc_hash:
             raise HTTPException(400, "hash is required")
         with sqlite3.connect(store.db_path) as conn:
