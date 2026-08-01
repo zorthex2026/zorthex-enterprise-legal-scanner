@@ -96,6 +96,10 @@ def create_receipt_pdf(
         fontSize=9, leading=12, fontName='Courier',
         textColor=DARK))
 
+    styles.add(ParagraphStyle('HashValue', parent=styles['Normal'],
+        fontSize=7, leading=10, fontName='Courier',
+        textColor=DARK, wordWrap='CJK', splitLongWords=False))
+
     styles.add(ParagraphStyle('FieldValueNormal', parent=styles['Normal'],
         fontSize=9, leading=12, textColor=DARK))
 
@@ -224,7 +228,7 @@ def create_receipt_pdf(
 
     hash_data = [
         [Paragraph("SHA-256 Hash", styles['FieldLabel']),
-         Paragraph(document_sha256, styles['FieldValue'])],
+         Paragraph(document_sha256, styles['HashValue'])],
     ]
     hash_table = Table(hash_data, colWidths=[35*mm, 125*mm])
     hash_table.setStyle(TableStyle([
