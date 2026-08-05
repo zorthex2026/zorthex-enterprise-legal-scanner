@@ -50,11 +50,11 @@ nav{display:flex;justify-content:space-between;align-items:center;padding:22px 6
   <div id="feedback-form">
 
     <div style="margin-bottom:32px;">
-      <label style="color:#e0e0e0;font-size:0.95rem;display:block;margin-bottom:12px;">1. Have you used ZTR to verify a document before a real filing, submission, or client delivery?</label>
+      <label style="color:#e0e0e0;font-size:0.95rem;display:block;margin-bottom:12px;">1. Was the verification process clear and easy to use?</label>
       <div style="display:flex;gap:16px;flex-wrap:wrap;">
         <button class="fb-option" data-q="used_real" data-v="yes" onclick="selectOption(this)">Yes</button>
-        <button class="fb-option" data-q="used_real" data-v="no" onclick="selectOption(this)">No</button>
-        <button class="fb-option" data-q="used_real" data-v="not_yet" onclick="selectOption(this)">Not yet</button>
+        <button class="fb-option" data-q="used_real" data-v="mostly" onclick="selectOption(this)">Mostly</button>
+        <button class="fb-option" data-q="used_real" data-v="confusing" onclick="selectOption(this)">Needs improvement</button>
       </div>
     </div>
 
@@ -64,11 +64,11 @@ nav{display:flex;justify-content:space-between;align-items:center;padding:22px 6
     </div>
 
     <div style="margin-bottom:32px;">
-      <label style="color:#e0e0e0;font-size:0.95rem;display:block;margin-bottom:12px;">3. At launch, ZTR will cost €6 per receipt (includes eIDAS-qualified timestamp + PDF + independent verification). Would you pass this cost to your client as a documented expense?</label>
+      <label style="color:#e0e0e0;font-size:0.95rem;display:block;margin-bottom:12px;">3. In which professional context would you most likely use ZTR?</label>
       <div style="display:flex;gap:12px;flex-wrap:wrap;">
-        <button class="fb-option" data-q="pricing" data-v="yes_easily" onclick="selectOption(this)">Yes, easily</button>
-        <button class="fb-option" data-q="pricing" data-v="probably" onclick="selectOption(this)">Probably</button>
-        <button class="fb-option" data-q="pricing" data-v="too_expensive" onclick="selectOption(this)">Too expensive</button>
+        <button class="fb-option" data-q="pricing" data-v="legal_filing" onclick="selectOption(this)">Court filings</button>
+        <button class="fb-option" data-q="pricing" data-v="contracts" onclick="selectOption(this)">Contracts</button>
+        <button class="fb-option" data-q="pricing" data-v="compliance" onclick="selectOption(this)">Regulatory compliance</button>
         <button class="fb-option" data-q="pricing" data-v="other" onclick="selectOption(this)">Other</button>
       </div>
     </div>
